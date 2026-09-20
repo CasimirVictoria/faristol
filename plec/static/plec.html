@@ -1327,7 +1327,9 @@
                             <option value="dialnet,recolecta,tdr,teseo,redined">🇪🇸 Dialnet, Recolecta (UPV) & Tesis</option>
                             <option value="openalex,eric,semanticscholar,crossref,doaj">🌍 Internacionals (OpenAlex, ERIC, CrossRef)</option>
                             <option value="arxiv,scielo,doaj">🔓 Accés Obert & Preprints (arXiv, SciELO)</option>
-                            <option value="boe">⚖️ Legislació & Normativa (BOE, Lleis, Reials Decrets)</option>
+                            <option value="legislacio">⚖️ Legislació (BOE Estatal & DOGV Valencià)</option>
+                            <option value="boe">⚖️ Legislació Estatal (BOE)</option>
+                            <option value="dogv">🏛️ Legislació Valenciana (DOGV)</option>
                         </select>
                         <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap;">
                             <input type="checkbox" id="search-academic-vpn" style="margin: 0;">
@@ -4521,10 +4523,10 @@ async function executarCercaAcademicaPlec() {
         }
         
         // Renderitzar resultats
-        const isBoeSearch = sources === 'boe';
+        const isLegSearch = sources === 'boe' || sources === 'dogv' || sources === 'legislacio';
         el.searchAcademicResults.innerHTML = `
             <div style="font-size: 11px; color: var(--text-muted); padding: 2px 4px; display: flex; justify-content: space-between; align-items: center;">
-                <span>${isBoeSearch ? `S'han trobat <strong>${items.length}</strong> normes / disposicions al BOE:` : `S'han trobat <strong>${items.length}</strong> articles deduplicats:`}</span>
+                <span>${isLegSearch ? `S'han trobat <strong>${items.length}</strong> normes / disposicions oficials:` : `S'han trobat <strong>${items.length}</strong> articles deduplicats:`}</span>
             </div>
         ` + items.map((item, idx) => {
             const title = item.title || "Sense títol";
@@ -4538,17 +4540,22 @@ async function executarCercaAcademicaPlec() {
             const ident = doi || item.url || title;
             const isBoe = sourcesList.includes("BOE") || item.source === "BOE" || (item.url && item.url.includes("boe.es"));
             const boeId = (item.extra && item.extra.boe_id) || (ident.match(/BOE-[A-Z]-\d{4}-\d+/i) ? ident.match(/BOE-[A-Z]-\d{4}-\d+/i)[0] : '');
-            
+            const isDogv = sourcesList.includes("DOGV") || item.source === "DOGV" || (item.url && item.url.includes("dogv.gva.es"));
+            const dogvSig = (item.extra && item.extra.codigo_insercion) || (ident.match(/\b\d{4}[/-]\d{4,8}\b/) ? ident.match(/\b\d{4}[/-]\d{4,8}\b/)[0] : '');
+            const isLeg = isBoe || isDogv;
+
             // Comprovar si ja tenim aquest paper o llei a la biblioteca
             let noteCand = null;
             let pdfCand = null;
             const jaImportat = state.notes.some(n => {
                 if (boeId && (n.filename.toLowerCase().includes(boeId.toLowerCase()) || (n.content && n.content.includes(boeId)))) { noteCand = n; return true; }
+                if (dogvSig && (n.filename.toLowerCase().includes(dogvSig.replace('/', '_').toLowerCase()) || (n.content && n.content.includes(dogvSig)))) { noteCand = n; return true; }
                 if (doi && n.content && n.content.includes(doi)) { noteCand = n; return true; }
                 if (n.title && n.title.toLowerCase() === title.toLowerCase()) { noteCand = n; return true; }
                 return false;
             }) || state.pdfs.some(p => {
                 if (boeId && p.filename.toLowerCase().includes(boeId.toLowerCase())) { pdfCand = p; return true; }
+                if (dogvSig && p.filename.toLowerCase().includes(dogvSig.replace('/', '_').toLowerCase())) { pdfCand = p; return true; }
                 const clean = title.toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (clean.length > 10 && p.filename.toLowerCase().replace(/[^a-z0-9]/g, '').includes(clean.substring(0, 15))) {
                     pdfCand = p;
@@ -4557,10 +4564,21 @@ async function executarCercaAcademicaPlec() {
                 return false;
             });
 
-            const cardBorderColor = isBoe ? '#f59e0b' : 'var(--accent)';
-            const boeBadge = isBoe ? '<span style="background: rgba(245, 158, 11, 0.15); color: #d97706; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">⚖️ BOE Oficial</span>' : '';
-            const rangoBadge = (isBoe && item.journal) ? `<span style="background: rgba(245, 158, 11, 0.1); color: #b45309; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">📜 ${escapeHtml(item.journal)}</span>` : '';
-            const oaBadge = isOa ? `<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">${isBoe ? '📄 PDF Oficial' : '🔓 Accés Obert'}</span>` : '';
+            const cardBorderColor = isDogv ? '#06b6d4' : (isBoe ? '#f59e0b' : 'var(--accent)');
+            const legBadge = isDogv
+                ? '<span style="background: rgba(6, 182, 212, 0.15); color: #0891b2; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏛️ DOGV Oficial</span>'
+                : (isBoe ? '<span style="background: rgba(245, 158, 11, 0.15); color: #d97706; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">⚖️ BOE Oficial</span>' : '');
+            const rangoBadge = (isLeg && item.journal)
+                ? `<span style="background: ${isDogv ? 'rgba(6, 182, 212, 0.1)' : 'rgba(245, 158, 11, 0.1)'}; color: ${isDogv ? '#0e7490' : '#b45309'}; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">📜 ${escapeHtml(item.journal)}</span>`
+                : '';
+            const oaBadge = (isOa || isLeg)
+                ? `<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">${isLeg ? '📄 PDF Oficial' : '🔓 Accés Obert'}</span>`
+                : '';
+
+            const btnBg = isDogv ? 'background: #0891b2; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isBoe ? 'background: #f59e0b; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : '');
+            const btnIcon = isDogv ? 'fa-landmark' : (isBoe ? 'fa-scale-balanced' : 'fa-download');
+            const btnLabel = isDogv ? 'Importar Norma DOGV' : (isBoe ? 'Importar Norma BOE' : 'Importar a Biblioteca');
+            const directPdfToPass = item.pdf_url || item.oa_url || '';
 
             return `
                 <div class="search-result-card" id="search-card-${idx}" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-left: 4px solid ${cardBorderColor}; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
@@ -4571,22 +4589,24 @@ async function executarCercaAcademicaPlec() {
                     </div>
                     
                     <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
-                        ${boeBadge}
+                        ${legBadge}
                         ${rangoBadge}
                         ${oaBadge}
-                        ${sourcesList.filter(s => s !== "BOE").map(s => `<span style="background: rgba(56, 189, 248, 0.15); color: #0284c7; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏷️ ${escapeHtml(s)}</span>`).join(' ')}
+                        ${sourcesList.filter(s => s !== "BOE" && s !== "DOGV").map(s => `<span style="background: rgba(56, 189, 248, 0.15); color: #0284c7; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏷️ ${escapeHtml(s)}</span>`).join(' ')}
                     </div>
 
                     <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;">
-                        ${isBoe ? '🏛️' : '👤'} <strong>${escapeHtml(authors)}</strong> ${year ? `(${year})` : ''}
+                        ${isLeg ? '🏛️' : '👤'} <strong>${escapeHtml(authors)}</strong> ${year ? `(${year})` : ''}
                         ${doiUrl ? ` | 🔗 <a href="${doiUrl}" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">DOI: ${escapeHtml(doi)}</a>` : ''}
                         ${(isBoe && item.url) ? ` | 🔗 <a href="${item.url}" target="_blank" rel="noopener" style="color: #d97706; text-decoration: underline; font-weight: 500;">Text consolidat BOE</a>` : ''}
+                        ${(isDogv && item.url) ? ` | 🔗 <a href="${item.url}" target="_blank" rel="noopener" style="color: #0891b2; text-decoration: underline; font-weight: 500;">Disposició DOGV</a>` : ''}
                         ${(isBoe && boeId) ? ` | <span style="font-family: monospace; font-size: 10px; color: var(--text-muted);">${escapeHtml(boeId)}</span>` : ''}
+                        ${(isDogv && dogvSig) ? ` | <span style="font-family: monospace; font-size: 10px; color: var(--text-muted);">${escapeHtml(dogvSig)}</span>` : ''}
                     </div>
 
                     ${abs ? `
                     <details style="font-size: 11px; color: var(--text-main); background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px;">
-                        <summary style="cursor: pointer; font-weight: 600; color: var(--text-muted); font-size: 10px;">📖 ${isBoe ? 'Mostrar preàmbul / resum' : 'Mostrar resum / abstract'}</summary>
+                        <summary style="cursor: pointer; font-weight: 600; color: var(--text-muted); font-size: 10px;">📖 ${isLeg ? 'Mostrar preàmbul / disposició' : 'Mostrar resum / abstract'}</summary>
                         <div style="margin-top: 4px; line-height: 1.45; white-space: pre-line;">${escapeHtml(abs)}</div>
                     </details>
                     ` : ''}
@@ -4599,8 +4619,8 @@ async function executarCercaAcademicaPlec() {
                             ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${noteCand.filename}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
                             ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${pdfCand.filename}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
                         ` : `
-                            <button class="btn btn-sm ${isBoe ? '' : 'btn-primary'}" id="btn-import-card-${idx}" onclick="importarArticleDesDeCerca('${escapeHtml(ident).replace(/'/g, "\\'")}', ${idx}, '${escapeHtml(item.oa_url || '').replace(/'/g, "\\'")}')" style="font-size: 11px; padding: 3px 8px; ${isBoe ? 'background: #f59e0b; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : ''}">
-                                <i class="fa-solid ${isBoe ? 'fa-scale-balanced' : 'fa-download'}"></i> ${isBoe ? 'Importar Norma a Biblioteca' : 'Importar a Biblioteca'}
+                            <button class="btn btn-sm ${isLeg ? '' : 'btn-primary'}" id="btn-import-card-${idx}" onclick="importarArticleDesDeCerca('${escapeHtml(ident).replace(/'/g, "\\'")}', ${idx}, '${escapeHtml(directPdfToPass).replace(/'/g, "\\'")}')" style="font-size: 11px; padding: 3px 8px; ${btnBg}">
+                                <i class="fa-solid ${btnIcon}"></i> ${btnLabel}
                             </button>
                         `}
                     </div>
