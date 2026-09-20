@@ -32,7 +32,8 @@ from plec.utils import (
     detectar_tots_els_pdfs,
     extraure_pagines_nota,
     extraure_identificador_fitxer,
-    extraure_tags_nota
+    extraure_tags_nota,
+    check_and_import_from_downloads
 )
 from plec.bibtex import GestorBibtex
 
@@ -185,6 +186,7 @@ async def llistar_notes(q: Optional[str] = None, tag: Optional[str] = None):
                 "size": stat.st_size,
                 "has_pdf": len(pdfs) > 0,
                 "pdf_count": len(pdfs),
+                "is_biblio": path.name.startswith("@"),
             })
         except Exception:
             continue
@@ -411,6 +413,81 @@ async def obtenir_connexions(filename: str):
             "outlinks": outlinks
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/notes/{filename}/rescue-pdf")
+async def rescatar_pdf_nota(filename: str):
+    """
+    Intenta recuperar el PDF d'una nota bibliogràfica (@citekey) des de ~/Downloads o fonts obertes.
+    """
+    path = NOTAS_DIR / filename
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Nota no trobada")
+
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+
+        is_biblio = path.name.startswith("@")
+        citekey = path.stem[1:] if is_biblio else path.stem
+        target_pdf = FONTS_DIR / f"{citekey}.pdf"
+
+        if target_pdf.is_file():
+            return {
+                "status": "ok",
+                "message": f"El PDF {target_pdf.name} ja existeix a la biblioteca.",
+                "filename": target_pdf.name
+            }
+
+        titol = _extreure_titol_nota(path, content[:1500])
+        m_doi = re.search(r'doi:\s*["\']?([^"\'\n\r]+)["\']?', content, re.IGNORECASE)
+        doi = m_doi.group(1).strip() if m_doi else ""
+        m_pmid = re.search(r'pmid:?\s*["\']?(\d+)["\']?', content, re.IGNORECASE)
+        pmid = m_pmid.group(1).strip() if m_pmid else (citekey[4:] if citekey.startswith("pmid") and citekey[4:].isdigit() else "")
+
+        # 1. Intentar rescatar des de ~/Downloads
+        trobat = check_and_import_from_downloads(target_pdf, title=titol, doi=doi, pmid=pmid)
+
+        # 2. Si no es troba a Downloads i té DOI, provar descarregar via add-paper / Unpaywall
+        if not trobat and doi:
+            add_paper_cmd = shutil.which("add-paper") or str(Path.home() / ".local" / "bin" / "add-paper")
+            proc = subprocess.run([add_paper_cmd, f"https://doi.org/{doi}"], capture_output=True, text=True, timeout=30)
+            if target_pdf.is_file():
+                trobat = True
+
+        if trobat and target_pdf.is_file():
+            try:
+                if BIB_FILE_PATH.exists():
+                    bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
+                    if f"{{{citekey}," in bib_text:
+                        if "file =" in bib_text:
+                            bib_text_nou = re.sub(
+                                rf'(@\w+\s*\{{\s*{re.escape(citekey)},[\s\S]*?file\s*=\s*\{{)[^}}]+(\}})',
+                                rf'\g<1>{str(target_pdf)}\g<2>',
+                                bib_text
+                            )
+                        else:
+                            bib_text_nou = re.sub(
+                                rf'(@\w+\s*\{{\s*{re.escape(citekey)},)',
+                                rf'\g<1>\n  file = {{{str(target_pdf)}}},',
+                                bib_text
+                            )
+                        BIB_FILE_PATH.write_text(bib_text_nou, encoding="utf-8")
+            except Exception as e_bib:
+                logger.warning(f"Error actualitzant file a bibtex: {e_bib}")
+
+            return {
+                "status": "ok",
+                "message": f"PDF rescatat correctament: {target_pdf.name}",
+                "filename": target_pdf.name
+            }
+        else:
+            return {
+                "status": "not_found",
+                "message": "No s'ha trobat cap PDF coincident a ~/Downloads ni en accés obert."
+            }
+    except Exception as e:
+        logger.error(f"Error rescatant PDF per a {filename}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

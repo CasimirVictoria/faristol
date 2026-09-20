@@ -77,6 +77,23 @@ def detectar_tots_els_pdfs(fichero_nota: Path, text: str) -> List[Tuple[int, Pat
     trobats = []
     rutes_vistes = set()
 
+    # 0. Resolució 1:1 canònica per a notes bibliogràfiques (@citekey.md <-> citekey.pdf)
+    if fichero_nota:
+        stem = ""
+        if fichero_nota.name.startswith("@"):
+            stem = fichero_nota.stem[1:]
+        else:
+            m_cite = re.search(r'^citekey:\s*["\']?@?([^"\'\n\r]+)["\']?', text, re.M)
+            if m_cite:
+                stem = m_cite.group(1).strip()
+        
+        if stem:
+            from .config import FONTS_DIR
+            pdf_canonic = FONTS_DIR / f"{stem}.pdf"
+            if pdf_canonic.is_file() and str(pdf_canonic.resolve()) not in rutes_vistes:
+                rutes_vistes.add(str(pdf_canonic.resolve()))
+                trobats.append((0, pdf_canonic.resolve(), pdf_canonic.name))
+
     for pat, tipus in patrons:
         for m in re.finditer(pat, text, re.IGNORECASE):
             etiqueta = ""
@@ -151,9 +168,60 @@ def extraure_tags_nota(contingut_o_nom: str, contingut: Optional[str] = None) ->
                     tags.add(t)
     
     # Inline #tags
-    for m in re.finditer(r'(?<!\w)#([a-zA-Z0-9_\-]+)', contingut):
-        t = m.group(1)
-        if not t.isdigit() and len(t) > 1:
-            tags.add(t)
+    if contingut:
+        for m in re.finditer(r'(?<!\w)#([a-zA-Z0-9_\-]+)', contingut):
+            t = m.group(1)
+            if not t.isdigit() and len(t) > 1:
+                tags.add(t)
             
     return sorted(list(tags))
+
+def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str = "", pmid: str = "") -> bool:
+    """
+    Comprova si l'usuari ha descarregat el PDF manualment a ~/Downloads (p. ex. quan l'editorial
+    utilitza Cloudflare o protecció antibot com MDPI, ScienceDirect, etc.).
+    """
+    downloads_dir = Path.home() / "Downloads"
+    if not downloads_dir.is_dir():
+        return False
+
+    import time
+    now = time.time()
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Paraules clau significatives del títol evitant termes genèrics biomèdics
+    stopwords = {
+        "with", "from", "that", "this", "study", "review", "their", "into", "journal",
+        "clinical", "health", "disease", "prevention", "human", "effect", "effects",
+        "role", "analysis", "system", "potential", "based", "using", "about", "between",
+        "approach", "perspective", "comprehensive"
+    }
+    title_words = [w.lower() for w in re.findall(r"[a-zA-Z]{4,}", title or "") if w.lower() not in stopwords]
+    doi_clean = re.sub(r"[^a-zA-Z0-9]", "", doi.split("/")[-1] if "/" in doi else doi).lower()
+
+    for p in downloads_dir.glob("*.pdf"):
+        try:
+            mtime = p.stat().st_mtime
+            if now - mtime > 28800:  # 8 hores
+                continue
+
+            fname_clean = re.sub(r"[^a-zA-Z0-9]", "", p.name).lower()
+
+            # 1. Coincidència de nom amb DOI o PMID
+            if (pmid and str(pmid) in p.name) or (doi_clean and len(doi_clean) > 4 and doi_clean in fname_clean):
+                shutil.copy2(p, target_path)
+                return True
+
+            # 2. Coincidència de text al contingut (primera pàgina)
+            if len(title_words) >= 2:
+                res = subprocess.run(["pdftotext", "-l", "1", str(p), "-"], capture_output=True, text=True, timeout=2)
+                if res.returncode == 0:
+                    text_lower = res.stdout.lower()
+                    matches = sum(1 for w in title_words if w in text_lower)
+                    if matches >= 3 and (matches / len(title_words) >= 0.5):
+                        shutil.copy2(p, target_path)
+                        return True
+        except Exception:
+            continue
+
+    return False

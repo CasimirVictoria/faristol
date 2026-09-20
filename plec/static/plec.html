@@ -2806,7 +2806,13 @@ function renderitzarLlistaNotes() {
         };
 
         const tagsHtml = (nota.tags || []).map(t => `<span style="color: var(--accent);">#${t}</span>`).join(' ');
-        const pdfBadge = nota.has_pdf ? `<span class="badge-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</span>` : '';
+        const isBiblio = nota.is_biblio || (nota.filename && nota.filename.startsWith('@'));
+        let pdfBadge = '';
+        if (nota.has_pdf) {
+            pdfBadge = `<span class="badge-pdf" title="PDF associat"><i class="fa-solid fa-file-pdf"></i> PDF</span>`;
+        } else if (isBiblio) {
+            pdfBadge = `<span class="badge-no-pdf" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;" title="Nota bibliogràfica sense PDF"><i class="fa-solid fa-file-circle-xmark"></i> Sense PDF</span>`;
+        }
         
         // Badges de col·leccions
         const colMatches = state.collections.filter(c => (c.notes || []).includes(nota.filename));
@@ -3477,10 +3483,26 @@ async function renderitzarConnexions(noteData) {
         });
     }
     
-    // 2. Retroenllaços (API de connexions)
+    // 2. Si és una nota bibliogràfica (@citekey) i no té PDF associat, oferir rescat des de ~/Downloads
+    if (noteData.filename && noteData.filename.startsWith('@') && (!noteData.pdfs || noteData.pdfs.length === 0)) {
+        const rescueDiv = document.createElement('div');
+        rescueDiv.style.cssText = 'padding: 6px 0; margin-bottom: 6px; border-bottom: 1px dashed var(--border-subtle);';
+        rescueDiv.innerHTML = `
+            <div style="font-size: 11px; color: #ef4444; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; font-weight: 500;">
+                <i class="fa-solid fa-circle-exclamation"></i> Nota bibliogràfica sense PDF associat.
+            </div>
+            <button class="btn btn-sm" onclick="rescatarPdfNota('${escapeHtml(noteData.filename)}')" style="background: #10b981; color: #fff; border: none; font-size: 11px; padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; width: 100%; justify-content: center; font-weight: 600;">
+                <i class="fa-solid fa-file-arrow-down"></i> Rescatar PDF de ~/Downloads
+            </button>
+        `;
+        el.connectionsBody.appendChild(rescueDiv);
+    }
+
+    // 3. Retroenllaços (API de connexions)
     try {
         const res = await fetch(`/api/notes/${encodeURIComponent(noteData.filename)}/connections`);
         if (res.ok) {
+            const conns = await res.json();
             const outlinks = conns.outlinks || conns.sortints || [];
             if (outlinks.length > 0) {
                 outlinks.forEach(s => {
@@ -3521,8 +3543,31 @@ async function renderitzarConnexions(noteData) {
     }
     
     el.connCount.textContent = totalConn;
-    if (totalConn === 0) {
+    if (totalConn === 0 && (!noteData.filename || !noteData.filename.startsWith('@') || (noteData.pdfs && noteData.pdfs.length > 0))) {
         el.connectionsBody.innerHTML = '<span style="color: var(--text-subtle); font-style: italic;">Cap vincle detectat en aquesta nota</span>';
+    }
+}
+
+// --- Rescatar PDF des de ~/Downloads ---
+async function rescatarPdfNota(filename) {
+    if (!filename) return;
+    try {
+        if (el.libraryStatus) el.libraryStatus.textContent = `Cercant PDF a ~/Downloads per a ${filename}...`;
+        const res = await fetch(`/api/notes/${encodeURIComponent(filename)}/rescue-pdf`, {
+            method: 'POST'
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            if (el.libraryStatus) el.libraryStatus.textContent = data.message;
+            await carregarDadesBiblioteca();
+            // Recarregar la nota i obrir el PDF associat automàticament
+            await obrirNota(filename, true, false);
+        } else {
+            alert(data.message || "No s'ha trobat cap PDF a ~/Downloads. Si l'has descarregat des del navegador, comprova que estiga a la carpeta ~/Downloads i torna a prémer.");
+            if (el.libraryStatus) el.libraryStatus.textContent = 'PDF no trobat a Descàrregues.';
+        }
+    } catch (e) {
+        alert(`Error rescatant PDF: ${e.message}`);
     }
 }
 
