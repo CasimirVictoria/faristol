@@ -104,6 +104,7 @@ class NlmQueryRequest(BaseModel):
     query: str
     conversation_id: Optional[str] = None
     source_id: Optional[str] = None
+    source_ids: Optional[List[str]] = None
 
 class NlmAddUrlRequest(BaseModel):
     notebook_id: str
@@ -1356,7 +1357,9 @@ async def nlm_consultar(req: NlmQueryRequest):
     args = ["query", "notebook", req.notebook_id, req.query, "--json"]
     if req.conversation_id:
         args.extend(["-c", req.conversation_id])
-    if req.source_id:
+    if req.source_ids and len(req.source_ids) > 0:
+        args.extend(["-s", ",".join(req.source_ids)])
+    elif req.source_id:
         args.extend(["-s", req.source_id])
 
     ok, text, data = await _exec_nlm_cli(args, parse_json=True)

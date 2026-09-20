@@ -722,6 +722,26 @@
             color: var(--text-main);
             border-color: var(--border-color);
         }
+        .nlm-source-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            user-select: none;
+            border: 1px solid transparent;
+        }
+        .nlm-source-item:hover {
+            background: var(--bg-subtle);
+            border-color: var(--border-subtle);
+        }
+        .nlm-source-item.selected {
+            background: rgba(56, 189, 248, 0.08);
+            border-color: rgba(56, 189, 248, 0.2);
+        }
 
         .preview-pane {
             flex: 1;
@@ -1287,6 +1307,35 @@
                     </select>
                 </div>
 
+                <!-- Secció de Fonts Documentals (a la part superior) -->
+                <div id="nlm-sources-section" style="display: flex; flex-direction: column; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                    <!-- Capçalera de Fonts -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-subtle); font-size: 11px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-layer-group" style="color: #38bdf8; font-size: 11px;"></i>
+                            <span id="nlm-sources-count" style="font-weight: 600; color: var(--text-main);">Fonts (0)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button id="btn-nlm-toggle-all-sources" class="btn btn-xs" style="font-size: 10px; padding: 1px 6px; border: 1px solid var(--border-color); border-radius: 3px; background: var(--bg-surface); color: var(--text-muted); cursor: pointer;" title="Alternar selecció de totes les fonts">Totes</button>
+                            <button id="btn-nlm-collapse-sources" class="btn btn-xs btn-icon-only" style="font-size: 10px; padding: 1px 4px; border: none; background: transparent; color: var(--text-muted); cursor: pointer;" title="Plegar / desplegar llista de fonts">
+                                <i class="fa-solid fa-chevron-up" id="icon-nlm-collapse-sources"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Llista de fonts seleccionables -->
+                    <div id="nlm-sources-list" style="max-height: 140px; overflow-y: auto; padding: 4px 6px; display: flex; flex-direction: column; gap: 2px;">
+                        <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px 0;">Sense fonts carregades</div>
+                    </div>
+                </div>
+
+                <!-- Separador i Capçalera del Xat -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-subtle); font-size: 10px; color: var(--text-muted); font-weight: 600; flex-shrink: 0;">
+                    <span style="display: flex; align-items: center; gap: 4px;">
+                        <i class="fa-solid fa-comments" style="color: #10b981;"></i> Xat i Respostes
+                    </span>
+                    <span id="nlm-chat-scope-label" style="color: #38bdf8; font-size: 10px;">Totes les fonts</span>
+                </div>
+
                 <!-- Historial de missatges -->
                 <div id="nlm-chat-history" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 0;">
                     <div id="nlm-empty-state" style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 30px; padding: 0 10px;">
@@ -1720,6 +1769,9 @@ const state = {
     nlmChatMessages: [],
     nlmIsQuerying: false,
     nlmAvailableNotebooks: [],
+    nlmSources: [],
+    nlmSelectedSourceIds: new Set(),
+    nlmSourcesCollapsed: false,
 };
 
 // Elements DOM
@@ -1765,6 +1817,13 @@ const el = {
     btnNlmOpenExt: document.getElementById('btn-nlm-open-ext'),
     nlmSelectorBar: document.getElementById('nlm-selector-bar'),
     nlmNotebooksSelect: document.getElementById('nlm-notebooks-select'),
+    nlmSourcesSection: document.getElementById('nlm-sources-section'),
+    nlmSourcesCount: document.getElementById('nlm-sources-count'),
+    btnNlmToggleAllSources: document.getElementById('btn-nlm-toggle-all-sources'),
+    btnNlmCollapseSources: document.getElementById('btn-nlm-collapse-sources'),
+    iconNlmCollapseSources: document.getElementById('icon-nlm-collapse-sources'),
+    nlmSourcesList: document.getElementById('nlm-sources-list'),
+    nlmChatScopeLabel: document.getElementById('nlm-chat-scope-label'),
     nlmChatHistory: document.getElementById('nlm-chat-history'),
     nlmChatInput: document.getElementById('nlm-chat-input'),
     btnNlmSend: document.getElementById('btn-nlm-send'),
@@ -2065,6 +2124,9 @@ async function carregarPanellNotebooklm() {
 
     actualitzarCapcaleraNlm();
     renderitzarNlmChat();
+    if (state.activeNotebookId) {
+        await carregarFontsQuadernNlm(state.activeNotebookId);
+    }
 }
 
 function actualitzarCapcaleraNlm() {
@@ -2111,6 +2173,148 @@ function actualitzarSelectQuadernsNlm() {
         opt.textContent = `${nb.title} (${nb.source_count || 0} fonts)`;
         if (nb.id === state.activeNotebookId) opt.selected = true;
         el.nlmNotebooksSelect.appendChild(opt);
+    });
+}
+
+async function carregarFontsQuadernNlm(notebookId) {
+    if (!notebookId) {
+        state.nlmSources = [];
+        state.nlmSelectedSourceIds.clear();
+        renderitzarFontsNlm();
+        return;
+    }
+    if (el.nlmSourcesList) {
+        el.nlmSourcesList.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px 0;">
+                <i class="fa-solid fa-circle-notch fa-spin" style="color: #38bdf8;"></i> Carregant fonts documentals...
+            </div>
+        `;
+    }
+    try {
+        const res = await fetch(`/api/nlm/sources?notebook_id=${encodeURIComponent(notebookId)}`);
+        if (res.ok) {
+            const data = await res.json();
+            state.nlmSources = data.sources || [];
+            // Per defecte, totes seleccionades com a NotebookLM natiu
+            state.nlmSelectedSourceIds = new Set(state.nlmSources.map(s => s.id));
+        } else {
+            state.nlmSources = [];
+            state.nlmSelectedSourceIds.clear();
+        }
+    } catch (err) {
+        console.error("Error carregant fonts de NotebookLM:", err);
+        state.nlmSources = [];
+        state.nlmSelectedSourceIds.clear();
+    }
+    renderitzarFontsNlm();
+}
+
+function renderitzarFontsNlm() {
+    if (!el.nlmSourcesList) return;
+    el.nlmSourcesList.innerHTML = '';
+
+    const total = state.nlmSources.length;
+    const selCount = state.nlmSelectedSourceIds.size;
+
+    if (el.nlmSourcesCount) {
+        el.nlmSourcesCount.textContent = `Fonts (${selCount}/${total})`;
+    }
+
+    if (el.nlmChatScopeLabel) {
+        if (total === 0) {
+            el.nlmChatScopeLabel.textContent = 'Sense fonts';
+        } else if (selCount === total) {
+            el.nlmChatScopeLabel.textContent = 'Totes les fonts';
+        } else if (selCount === 0) {
+            el.nlmChatScopeLabel.textContent = 'Cap font seleccionada';
+        } else if (selCount === 1) {
+            el.nlmChatScopeLabel.textContent = '1 font seleccionada';
+        } else {
+            el.nlmChatScopeLabel.textContent = `${selCount} fonts seleccionades`;
+        }
+    }
+
+    if (el.nlmChatInput) {
+        if (total === 0) {
+            el.nlmChatInput.placeholder = 'Quadern sense fonts documentals...';
+        } else if (selCount === 0) {
+            el.nlmChatInput.placeholder = 'Selecciona almenys una font...';
+        } else if (selCount === total) {
+            el.nlmChatInput.placeholder = `Pregunta al quadern (${total} fonts)... (Enter per enviar)`;
+        } else {
+            el.nlmChatInput.placeholder = `Pregunta a les ${selCount} fonts seleccionades... (Enter per enviar)`;
+        }
+    }
+
+    if (el.btnNlmToggleAllSources) {
+        el.btnNlmToggleAllSources.textContent = (selCount === total && total > 0) ? 'Cap' : 'Totes';
+        el.btnNlmToggleAllSources.title = (selCount === total && total > 0) ? 'Deseleccionar totes' : 'Seleccionar totes';
+    }
+
+    if (total === 0) {
+        el.nlmSourcesList.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px 0;">
+                Aquest quadern encara no té fonts documentals.
+            </div>
+        `;
+        return;
+    }
+
+    state.nlmSources.forEach(s => {
+        const isSelected = state.nlmSelectedSourceIds.has(s.id);
+        const item = document.createElement('div');
+        item.className = `nlm-source-item${isSelected ? ' selected' : ''}`;
+        item.dataset.sourceId = s.id;
+
+        const isPdf = s.type === 'pdf' || (s.title && s.title.toLowerCase().endsWith('.pdf'));
+        const iconClass = isPdf ? 'fa-file-pdf' : (s.url || s.type === 'url' ? 'fa-globe' : 'fa-file-lines');
+        const iconColor = isPdf ? '#ef4444' : (s.url || s.type === 'url' ? '#38bdf8' : '#10b981');
+        const cleanTitle = s.title || 'Sense títol';
+
+        const pdfTrobat = isPdf && state.pdfs ? state.pdfs.find(p => 
+            p.filename === s.title || 
+            p.filename.toLowerCase() === s.title.toLowerCase() ||
+            p.stem === s.title.replace(/\.pdf$/i, '')
+        ) : null;
+
+        item.innerHTML = `
+            <input type="checkbox" class="nlm-source-checkbox" ${isSelected ? 'checked' : ''} style="margin: 0; cursor: pointer; flex-shrink: 0;">
+            <i class="fa-solid ${iconClass}" style="color: ${iconColor}; font-size: 11px; flex-shrink: 0;"></i>
+            <span class="nlm-source-title" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px;" title="${escapeHtml(cleanTitle)}">${escapeHtml(cleanTitle)}</span>
+            ${pdfTrobat ? `<button class="btn btn-xs btn-icon-only nlm-open-pdf-btn" title="Obrir PDF a Plec" style="font-size: 10px; padding: 1px 4px; opacity: 0.7;"><i class="fa-solid fa-book-open"></i></button>` : ''}
+        `;
+
+        const chk = item.querySelector('.nlm-source-checkbox');
+        chk.addEventListener('change', (e) => {
+            e.stopPropagation();
+            if (chk.checked) {
+                state.nlmSelectedSourceIds.add(s.id);
+            } else {
+                state.nlmSelectedSourceIds.delete(s.id);
+            }
+            renderitzarFontsNlm();
+        });
+
+        const openPdfBtn = item.querySelector('.nlm-open-pdf-btn');
+        if (openPdfBtn && pdfTrobat) {
+            openPdfBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                carregarPdf(pdfTrobat.filename);
+            });
+        }
+
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.nlm-open-pdf-btn') || e.target === chk) return;
+            chk.checked = !chk.checked;
+            if (chk.checked) {
+                state.nlmSelectedSourceIds.add(s.id);
+            } else {
+                state.nlmSelectedSourceIds.delete(s.id);
+            }
+            renderitzarFontsNlm();
+        });
+
+        el.nlmSourcesList.appendChild(item);
     });
 }
 
@@ -2304,6 +2508,12 @@ function renderitzarNlmChat() {
             const div = document.createElement('div');
             div.className = 'nlm-msg-user';
             div.textContent = msg.text;
+            if (msg.sourcesCount && msg.totalSources && msg.sourcesCount < msg.totalSources) {
+                const badge = document.createElement('div');
+                badge.style.cssText = 'font-size: 9px; opacity: 0.85; margin-top: 4px; font-style: italic; text-align: right;';
+                badge.textContent = `🎯 ${msg.sourcesCount} de ${msg.totalSources} fonts`;
+                div.appendChild(badge);
+            }
             el.nlmChatHistory.appendChild(div);
         } else {
             const div = document.createElement('div');
@@ -2407,23 +2617,39 @@ async function enviarNlmPregunta(text) {
         return;
     }
 
+    if (state.nlmSources && state.nlmSources.length > 0 && state.nlmSelectedSourceIds.size === 0) {
+        alert("Selecciona com a mínim una font per fer la pregunta a NotebookLM.");
+        return;
+    }
+
     // Buidar camp de text
     if (el.nlmChatInput) el.nlmChatInput.value = '';
 
     // Afegir missatge d'usuari
-    state.nlmChatMessages.push({ role: 'user', text: query });
+    state.nlmChatMessages.push({
+        role: 'user',
+        text: query,
+        sourcesCount: state.nlmSelectedSourceIds.size,
+        totalSources: state.nlmSources ? state.nlmSources.length : 0
+    });
     state.nlmIsQuerying = true;
     renderitzarNlmChat();
 
     try {
+        const payload = {
+            notebook_id: state.activeNotebookId,
+            query: query,
+            conversation_id: state.nlmConversationId
+        };
+        // Si l'usuari ha seleccionat un subconjunt de fonts, filtrar per aquestes:
+        if (state.nlmSources && state.nlmSelectedSourceIds.size > 0 && state.nlmSelectedSourceIds.size < state.nlmSources.length) {
+            payload.source_ids = Array.from(state.nlmSelectedSourceIds);
+        }
+
         const res = await fetch('/api/nlm/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                notebook_id: state.activeNotebookId,
-                query: query,
-                conversation_id: state.nlmConversationId
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
@@ -3642,7 +3868,7 @@ function configurarEvents() {
         };
     }
     if (el.nlmNotebooksSelect) {
-        el.nlmNotebooksSelect.onchange = () => {
+        el.nlmNotebooksSelect.onchange = async () => {
             const selId = el.nlmNotebooksSelect.value;
             const selNb = (state.nlmAvailableNotebooks || []).find(n => n.id === selId);
             if (selNb) {
@@ -3652,6 +3878,7 @@ function configurarEvents() {
                 state.nlmChatMessages = [];
                 actualitzarCapcaleraNlm();
                 renderitzarNlmChat();
+                await carregarFontsQuadernNlm(state.activeNotebookId);
             }
         };
     }
@@ -3660,6 +3887,28 @@ function configurarEvents() {
             state.nlmConversationId = null;
             state.nlmChatMessages = [];
             renderitzarNlmChat();
+        };
+    }
+    if (el.btnNlmToggleAllSources) {
+        el.btnNlmToggleAllSources.onclick = () => {
+            const total = state.nlmSources.length;
+            if (state.nlmSelectedSourceIds.size === total && total > 0) {
+                state.nlmSelectedSourceIds.clear();
+            } else {
+                state.nlmSelectedSourceIds = new Set(state.nlmSources.map(s => s.id));
+            }
+            renderitzarFontsNlm();
+        };
+    }
+    if (el.btnNlmCollapseSources) {
+        el.btnNlmCollapseSources.onclick = () => {
+            state.nlmSourcesCollapsed = !state.nlmSourcesCollapsed;
+            if (el.nlmSourcesList) {
+                el.nlmSourcesList.style.display = state.nlmSourcesCollapsed ? 'none' : 'flex';
+            }
+            if (el.iconNlmCollapseSources) {
+                el.iconNlmCollapseSources.className = state.nlmSourcesCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+            }
         };
     }
 
