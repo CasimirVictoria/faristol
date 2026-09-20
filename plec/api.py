@@ -594,7 +594,8 @@ async def cerca_academica_federada(
                 EuropePMCSearcher, SemanticScholarSearcher, CrossRefSearcher,
                 CoreSearcher, TeseoSearcher, RedinedSearcher, EricSearcher,
                 TDRSearcher, RedalycSearcher, ScieloSearcher, ZenodoSearcher,
-                RecolectaSearcher, DOAJSearcher, DBLPSearcher, clean_and_reconstruct_abstract
+                RecolectaSearcher, DOAJSearcher, DBLPSearcher, BOESearcher,
+                clean_and_reconstruct_abstract
             )
 
             SEARCHER_MAP = {
@@ -616,7 +617,39 @@ async def cerca_academica_federada(
                 "recolecta": RecolectaSearcher,
                 "doaj": DOAJSearcher,
                 "dblp": DBLPSearcher,
+                "boe": BOESearcher,
             }
+
+            def _traduir_legals_boe(text: str) -> str:
+                dicc_legal = {
+                    "reial decret": "real decreto",
+                    "reials decrets": "reales decretos",
+                    "llei organica": "ley organica",
+                    "llei orgànica": "ley organica",
+                    "llei": "ley",
+                    "lleis": "leyes",
+                    "decret": "decreto",
+                    "decrets": "decretos",
+                    "ordre": "orden",
+                    "ordres": "ordenes",
+                    "curriculum": "curriculo",
+                    "currículum": "curriculo",
+                    "ensenyaments minims": "ensenanzas minimas",
+                    "ensenyaments mínims": "ensenanzas minimas",
+                    "secundaria": "secundaria",
+                    "secundària": "secundaria",
+                    "primaria": "primaria",
+                    "primària": "primaria",
+                    "batxillerat": "bachillerato",
+                    "educacio": "educacion",
+                    "educació": "educacion",
+                    "avaluacio": "evaluacion",
+                    "avaluació": "evaluacion",
+                }
+                t_lower = text.lower()
+                for k, v in sorted(dicc_legal.items(), key=lambda x: len(x[0]), reverse=True):
+                    t_lower = t_lower.replace(k, v)
+                return t_lower
 
             if not sources or sources.strip().lower() == "all":
                 target_sources = ["openalex", "dialnet", "arxiv", "eric", "semanticscholar", "crossref", "doaj", "scielo", "recolecta", "redined", "tdr"]
@@ -631,14 +664,21 @@ async def cerca_academica_federada(
                 cls = SEARCHER_MAP.get(s_name)
                 if cls:
                     searcher = cls()
-                    q_to_use = q_es if s_name in ["dialnet", "redined", "teseo", "tdr", "recolecta", "scielo", "redalyc"] else q_en
-                    tasks.append(asyncio.wait_for(searcher.search(q_to_use, limit=limit), timeout=15.0))
+                    if s_name == "boe":
+                        q_to_use = _traduir_legals_boe(q)
+                    elif s_name in ["dialnet", "redined", "teseo", "tdr", "recolecta", "scielo", "redalyc"]:
+                        q_to_use = q_es
+                    else:
+                        q_to_use = q_en
+                    tasks.append(asyncio.wait_for(searcher.search(q_to_use, limit=limit), timeout=20.0))
 
             search_results = await asyncio.gather(*tasks, return_exceptions=True)
             results = []
             seen_keys = set()
             for res_list in search_results:
-                if isinstance(res_list, list):
+                if isinstance(res_list, Exception):
+                    logger.error(f"Searcher error: {res_list}", exc_info=res_list)
+                elif isinstance(res_list, list):
                     for paper in res_list:
                         doi = (paper.doi or "").strip().lower()
                         title_clean = re.sub(r'[^a-zA-Z0-9]+', '', paper.title.lower())
@@ -647,15 +687,20 @@ async def cerca_academica_federada(
                             continue
                         if key:
                             seen_keys.add(key)
+                        year_val = str(paper.year) if hasattr(paper, 'year') and paper.year else (paper.published_date[:4] if paper.published_date else "")
                         results.append({
                             "title": paper.title,
                             "authors": paper.authors,
-                            "year": str(paper.year) if paper.year else "",
+                            "year": year_val,
+                            "date": paper.published_date or "",
                             "doi": paper.doi,
+                            "url": paper.url or "",
+                            "journal": paper.journal or "",
                             "abstract": clean_and_reconstruct_abstract(paper.abstract),
                             "is_oa": bool(paper.pdf_url),
                             "oa_url": paper.pdf_url or "",
                             "sources": [paper.source],
+                            "extra": getattr(paper, 'extra', {}) or {},
                             "id": paper.doi or paper.url or paper.title
                         })
             return {

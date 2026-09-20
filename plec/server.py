@@ -36,7 +36,14 @@ app.include_router(api_router)
 async def servir_index():
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(str(index_path))
+        return FileResponse(
+            str(index_path),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {"message": "Plec Web API activa. Falta index.html a static/"}
 
 # Ruta /plec compatible
@@ -44,7 +51,14 @@ async def servir_index():
 async def servir_plec():
     index_path = STATIC_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(str(index_path))
+        return FileResponse(
+            str(index_path),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {"message": "Plec Web API activa. Falta index.html a static/"}
 
 # Muntar fitxers estàtics (PDF.js, Vditor, KaTeX, FontAwesome, CSS, JS)
