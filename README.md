@@ -151,6 +151,20 @@ Configuració i metadades auxiliars:
 └── highlights.json             # Subratllats de lectura persistents
 ```
 
+### 🏷️ La Convenció de l'Arroba (`@`): Notes Bibliogràfiques vs. Notes Pròpies
+
+Al directori `~/Documents/notes/`, Plec i el seu ecosistema distingeixen de forma fonamental dues tipologies de notes mitjançant el prefix del fitxer:
+
+| Tipus de Nota | Nomenclatura del fitxer | Descripció i Propòsit | Exemple |
+| :--- | :--- | :--- | :--- |
+| **Nota Bibliogràfica** *(Literature Note)* | **`@{citekey}.md`** *(sempre amb arroba inicial)* | Fitxa d'estudi vinculada directament a una font externa, document o article científic. Conté les metadades YAML (`citekey`, `pdf`), resums de l'obra, cites textuals i reflexions sobre la lectura. | `@berzosaPensamentComputacional2024.md` |
+| **Nota Pròpia / Permanent** *(Evergreen / Atomic Note)* | **`{timestamp}--{slug}_{tags}.md`** o **`{slug}.md`** *(sense arroba)* | Nota de pensament propi elaborada totalment per nosaltres. Desenvolupa un concepte, tesi, hipòtesi o argument personal (seguint Denote o Zettelkasten). Enllaça cap a les fonts usant `[[@citekey]]` o cites Pandoc `[@citekey, p. 12]`. | `20260920T120000--didactica-de-la-fisica_ciencies.md` |
+
+> **Per què aquesta distinció és crucial?**  
+> 1. **Diferenciació visual i conceptual immediata:** Amb un cop d'ull a la carpeta de notes o a l'arbre lateral de Plec, saps a l'instant si estàs llegint la síntesi d'un autor extern (`@...`) o una idea original teua.  
+> 2. **Vinculació automàtica 1:1:** Plec i `zoterless` aprofiten el patró `@{citekey}.md` per obrir automàticament el PDF corresponent `{citekey}.pdf` al visor central i resoldre les metadades de `biblioteca.bib`.  
+> 3. **Claredat epistèmica en la investigació:** Evita la confusió freqüent en el treball acadèmic entre el que diu la literatura científica i el que constitueix la teua pròpia aportació o anàlisi.
+
 ---
 
 ## 🚀 Instal·lació i Ús
