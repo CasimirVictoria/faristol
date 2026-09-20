@@ -2299,7 +2299,8 @@ function renderitzarFontsNlm() {
         if (openPdfBtn && pdfTrobat) {
             openPdfBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                carregarPdf(pdfTrobat.filename);
+                e.preventDefault();
+                obrirPdf(pdfTrobat.filename, true);
             });
         }
 
@@ -2470,7 +2471,7 @@ function saltarACitacioNlm(pdfFilename, pageNum, citedText = '') {
     if (state.activePdfFilename === nomFinal && el.pdfFrame && el.pdfFrame.contentWindow && el.pdfFrame.contentWindow.PDFViewerApplication) {
         saltarAPaginaPdf(pag, citedText);
     } else {
-        carregarPdf(nomFinal);
+        obrirPdf(nomFinal, false);
         let count = 0;
         const checkPdfLoaded = setInterval(() => {
             count++;
@@ -2540,7 +2541,7 @@ function renderitzarNlmChat() {
                     chip.title = `Font: ${src.title}`;
                     chip.onclick = () => {
                         const trobat = state.pdfs.find(p => p.filename === src.title || p.stem === src.citekey);
-                        if (trobat) carregarPdf(trobat.filename);
+                        if (trobat) obrirPdf(trobat.filename, true);
                     };
                     sourcesDiv.appendChild(chip);
                 });
