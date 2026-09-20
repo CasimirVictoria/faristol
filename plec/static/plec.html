@@ -4495,8 +4495,8 @@ async function executarCercaAcademicaPlec() {
                         <i class="fa-solid fa-language" style="color: #10b981;"></i> Traducció automàtica local (Argos):
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 2px;">
-                        ${en && en.toLowerCase() !== orig.toLowerCase() ? `<div>🇬🇧 <strong>Anglès:</strong> <em>"${escapeHtml(en)}"</em></div>` : ''}
-                        ${es && es.toLowerCase() !== orig.toLowerCase() ? `<div>🇪🇸 <strong>Castellà:</strong> <em>"${escapeHtml(es)}"</em></div>` : ''}
+                        ${en && en.toLowerCase() !== orig.toLowerCase() ? `<div>🇬🇧 <strong>Anglès:</strong> <em>${escapeHtml(en.replace(/^"(.*)"$/, '$1'))}</em></div>` : ''}
+                        ${es && es.toLowerCase() !== orig.toLowerCase() ? `<div>🇪🇸 <strong>Castellà:</strong> <em>${escapeHtml(es.replace(/^"(.*)"$/, '$1'))}</em></div>` : ''}
                     </div>
                 `;
                 el.searchAcademicBanner.style.display = 'block';
@@ -4532,7 +4532,8 @@ async function executarCercaAcademicaPlec() {
             </div>
         ` + items.map((item, idx) => {
             const title = item.title || "Sense títol";
-            const authors = Array.isArray(item.authors) ? item.authors.join(', ') : (item.authors || "Desconegut");
+            const authorsList = Array.isArray(item.authors) ? item.authors.filter(a => a && a !== item.journal) : (item.authors && item.authors !== item.journal ? [item.authors] : []);
+            const authors = authorsList.join(', ');
             const year = item.year || "";
             const doi = item.doi || "";
             const doiUrl = doi ? (doi.startsWith('http') ? doi : `https://doi.org/${doi}`) : "";
@@ -4598,11 +4599,12 @@ async function executarCercaAcademicaPlec() {
                         ${legBadge}
                         ${rangoBadge}
                         ${oaBadge}
-                        ${sourcesList.filter(s => s !== "BOE" && s !== "DOGV").map(s => `<span style="background: rgba(56, 189, 248, 0.15); color: #0284c7; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏷️ ${escapeHtml(s)}</span>`).join(' ')}
+                        ${sourcesList.filter(s => s !== "BOE" && s !== "DOGV" && !s.includes("BioMCP")).map(s => `<span style="background: rgba(56, 189, 248, 0.15); color: #0284c7; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏷️ ${escapeHtml(s)}</span>`).join(' ')}
                     </div>
 
                     <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;">
-                        ${isLeg ? '🏛️' : (isBio ? '🩺' : '👤')} <strong>${escapeHtml(authors)}</strong> ${year ? `(${year})` : ''}
+                        ${authors ? `${isLeg ? '🏛️' : (isBio ? '🩺' : '👤')} <strong>${escapeHtml(authors)}</strong> ` : ''}
+                        ${item.journal ? (authors ? `(${escapeHtml(item.journal)}${year ? `, ${year}` : ''})` : `<strong>${escapeHtml(item.journal)}</strong> ${year ? `(${year})` : ''}`) : (year ? `(${year})` : '')}
                         ${doiUrl ? ` | 🔗 <a href="${doiUrl}" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">DOI: ${escapeHtml(doi)}</a>` : ''}
                         ${(isBoe && item.url) ? ` | 🔗 <a href="${item.url}" target="_blank" rel="noopener" style="color: #d97706; text-decoration: underline; font-weight: 500;">Text consolidat BOE</a>` : ''}
                         ${(isDogv && item.url) ? ` | 🔗 <a href="${item.url}" target="_blank" rel="noopener" style="color: #0891b2; text-decoration: underline; font-weight: 500;">Disposició DOGV</a>` : ''}
