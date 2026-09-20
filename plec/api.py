@@ -560,177 +560,48 @@ async def cerca_academica_federada(
     limit: int = 5,
     sources: Optional[str] = Query("all", description="Fonts separades per coma o 'all'.")
 ):
-    """Cerca federada multilingüe a OpenAlex, ERIC, Dialnet, Crossref i bases d'academic-spain."""
-    import runpy
-    import io
-    import contextlib
-
-    add_paper_script = Path.home() / ".local" / "bin" / "add-paper"
-    if not add_paper_script.exists():
-        add_paper_script = Path.home() / "Projects" / "zoterless" / "bin" / "add-paper"
-
-    translations = {}
-    if add_paper_script.exists():
-        try:
-            mod = runpy.run_path(str(add_paper_script))
-            expand_fn = mod.get("expand_query_multilingual")
-            if expand_fn:
-                translations = expand_fn(q)
-        except Exception:
-            pass
-
+    """Cerca federada multilingüe a través del motor centralitzat d'academic-spain."""
     mcp_academic_dir = Path.home() / "Projects" / "mcp-server-academic-spain"
-    if sources and mcp_academic_dir.exists():
+    if mcp_academic_dir.exists():
+        import glob
+        for sp in glob.glob(str(mcp_academic_dir / "venv/lib/python3.*/site-packages")):
+            if sp not in sys.path:
+                sys.path.insert(0, sp)
+        if str(mcp_academic_dir) not in sys.path:
+            sys.path.insert(0, str(mcp_academic_dir))
+
         try:
-            import glob
-            for sp in glob.glob(str(mcp_academic_dir / "venv/lib/python3.*/site-packages")):
-                if sp not in sys.path:
-                    sys.path.insert(0, sp)
-            if str(mcp_academic_dir) not in sys.path:
-                sys.path.insert(0, str(mcp_academic_dir))
-
-            from platforms import (
-                DialnetSearcher, OpenAlexSearcher, ArxivSearcher, PubMedSearcher,
-                EuropePMCSearcher, SemanticScholarSearcher, CrossRefSearcher,
-                CoreSearcher, TeseoSearcher, RedinedSearcher, EricSearcher,
-                TDRSearcher, RedalycSearcher, ScieloSearcher, ZenodoSearcher,
-                RecolectaSearcher, DOAJSearcher, DBLPSearcher, BOESearcher,
-                clean_and_reconstruct_abstract
-            )
-
-            SEARCHER_MAP = {
-                "dialnet": DialnetSearcher,
-                "openalex": OpenAlexSearcher,
-                "arxiv": ArxivSearcher,
-                "pubmed": PubMedSearcher,
-                "europepmc": EuropePMCSearcher,
-                "semanticscholar": SemanticScholarSearcher,
-                "crossref": CrossRefSearcher,
-                "core": CoreSearcher,
-                "teseo": TeseoSearcher,
-                "redined": RedinedSearcher,
-                "eric": EricSearcher,
-                "tdr": TDRSearcher,
-                "redalyc": RedalycSearcher,
-                "scielo": ScieloSearcher,
-                "zenodo": ZenodoSearcher,
-                "recolecta": RecolectaSearcher,
-                "doaj": DOAJSearcher,
-                "dblp": DBLPSearcher,
-                "boe": BOESearcher,
-            }
-
-            def _traduir_legals_boe(text: str) -> str:
-                dicc_legal = {
-                    "reial decret": "real decreto",
-                    "reials decrets": "reales decretos",
-                    "llei organica": "ley organica",
-                    "llei orgànica": "ley organica",
-                    "llei": "ley",
-                    "lleis": "leyes",
-                    "decret": "decreto",
-                    "decrets": "decretos",
-                    "ordre": "orden",
-                    "ordres": "ordenes",
-                    "curriculum": "curriculo",
-                    "currículum": "curriculo",
-                    "ensenyaments minims": "ensenanzas minimas",
-                    "ensenyaments mínims": "ensenanzas minimas",
-                    "secundaria": "secundaria",
-                    "secundària": "secundaria",
-                    "primaria": "primaria",
-                    "primària": "primaria",
-                    "batxillerat": "bachillerato",
-                    "educacio": "educacion",
-                    "educació": "educacion",
-                    "avaluacio": "evaluacion",
-                    "avaluació": "evaluacion",
-                }
-                t_lower = text.lower()
-                for k, v in sorted(dicc_legal.items(), key=lambda x: len(x[0]), reverse=True):
-                    t_lower = t_lower.replace(k, v)
-                return t_lower
-
-            if not sources or sources.strip().lower() == "all":
-                target_sources = ["openalex", "dialnet", "arxiv", "eric", "semanticscholar", "crossref", "doaj", "scielo", "recolecta", "redined", "tdr"]
-            else:
-                target_sources = [s.strip().lower() for s in sources.split(",") if s.strip().lower() in SEARCHER_MAP]
-
-            q_en = translations.get("en", q)
-            q_es = translations.get("es", q)
-
-            tasks = []
-            for s_name in target_sources:
-                cls = SEARCHER_MAP.get(s_name)
-                if cls:
-                    searcher = cls()
-                    if s_name == "boe":
-                        q_to_use = _traduir_legals_boe(q)
-                    elif s_name in ["dialnet", "redined", "teseo", "tdr", "recolecta", "scielo", "redalyc"]:
-                        q_to_use = q_es
-                    else:
-                        q_to_use = q_en
-                    tasks.append(asyncio.wait_for(searcher.search(q_to_use, limit=limit), timeout=20.0))
-
-            search_results = await asyncio.gather(*tasks, return_exceptions=True)
+            from platforms import search_academic
+            data = await search_academic(query=q, sources=sources, limit=limit, expand=True)
             results = []
-            seen_keys = set()
-            for res_list in search_results:
-                if isinstance(res_list, Exception):
-                    logger.error(f"Searcher error: {res_list}", exc_info=res_list)
-                elif isinstance(res_list, list):
-                    for paper in res_list:
-                        doi = (paper.doi or "").strip().lower()
-                        title_clean = re.sub(r'[^a-zA-Z0-9]+', '', paper.title.lower())
-                        key = doi if doi else title_clean
-                        if key and key in seen_keys:
-                            continue
-                        if key:
-                            seen_keys.add(key)
-                        year_val = str(paper.year) if hasattr(paper, 'year') and paper.year else (paper.published_date[:4] if paper.published_date else "")
-                        results.append({
-                            "title": paper.title,
-                            "authors": paper.authors,
-                            "year": year_val,
-                            "date": paper.published_date or "",
-                            "doi": paper.doi,
-                            "url": paper.url or "",
-                            "journal": paper.journal or "",
-                            "abstract": clean_and_reconstruct_abstract(paper.abstract),
-                            "is_oa": bool(paper.pdf_url),
-                            "oa_url": paper.pdf_url or "",
-                            "sources": [paper.source],
-                            "extra": getattr(paper, 'extra', {}) or {},
-                            "id": paper.doi or paper.url or paper.title
-                        })
+            for paper in data.get("results", []):
+                year_val = str(paper.year) if hasattr(paper, 'year') and paper.year else (paper.published_date[:4] if paper.published_date else "")
+                results.append({
+                    "title": paper.title,
+                    "authors": paper.authors,
+                    "year": year_val,
+                    "date": paper.published_date or "",
+                    "doi": paper.doi,
+                    "url": paper.url or "",
+                    "journal": paper.journal or "",
+                    "abstract": paper.abstract,
+                    "is_oa": bool(paper.pdf_url),
+                    "oa_url": paper.pdf_url or "",
+                    "sources": [s.strip() for s in paper.source.split(",")],
+                    "extra": getattr(paper, 'extra', {}) or {},
+                    "id": paper.doi or paper.url or paper.title
+                })
             return {
                 "query": q,
-                "translations": translations,
+                "translations": data.get("translations", {}),
                 "total": len(results),
                 "results": results
             }
         except Exception as e:
-            logger.error(f"Error in academic-spain search: {e}", exc_info=True)
-
-    # Fallback per defecte: federated_search de add-paper
-    if add_paper_script.exists():
-        try:
-            mod = runpy.run_path(str(add_paper_script))
-            federated_search_fn = mod.get("federated_search")
-            sink = io.StringIO()
-            with contextlib.redirect_stdout(sink):
-                items = federated_search_fn(q, limit_per_source=limit)
-
-            return {
-                "query": q,
-                "translations": translations,
-                "total": len(items),
-                "results": items
-            }
-        except Exception as e:
+            logger.error(f"Error in academic search: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Error executant la cerca acadèmica: {e}")
 
-    raise HTTPException(status_code=500, detail="Cap motor de cerca acadèmica disponible")
+    raise HTTPException(status_code=500, detail="Motor academic-spain no disponible")
 
 @router.post("/academic/import")
 async def importar_article_zoterless(req: AcademicImportRequest):
