@@ -2350,9 +2350,6 @@ function convertirCitacionsAPandoc(text, citations, sources, wrapHtml = false, c
 
         // Agrupar per citekey per construir Pandoc net [@citekey, p. X]
         const citekeyGroups = {};
-        let primerPdfFilename = null;
-        let primerPageNum = 1;
-        let primerCitedText = '';
 
         numbers.forEach(num => {
             let srcId = citations[num];
@@ -2369,24 +2366,26 @@ function convertirCitacionsAPandoc(text, citations, sources, wrapHtml = false, c
                 if (!citekeyGroups[citekey]) {
                     citekeyGroups[citekey] = {
                         pages: new Set(),
+                        pageDetails: {},
                         pdf: pdf,
                         title: (src && src.title) || pdf,
                         citedTexts: []
                     };
                 }
-                if (page) citekeyGroups[citekey].pages.add(page);
+                if (page) {
+                    citekeyGroups[citekey].pages.add(page);
+                    if (!citekeyGroups[citekey].pageDetails[page]) {
+                        citekeyGroups[citekey].pageDetails[page] = { citedText: citedText };
+                    }
+                }
                 if (citedText) citekeyGroups[citekey].citedTexts.push(citedText);
 
-                if (!primerPdfFilename && pdf) {
-                    primerPdfFilename = pdf.endsWith('.pdf') ? pdf : `${pdf}.pdf`;
-                    primerPageNum = page;
-                    primerCitedText = citedText;
-                } else if (!primerPdfFilename && citekey && typeof state !== 'undefined' && state.pdfs) {
+                if (!citekeyGroups[citekey].pdf && pdf) {
+                    citekeyGroups[citekey].pdf = pdf.endsWith('.pdf') ? pdf : `${pdf}.pdf`;
+                } else if (!citekeyGroups[citekey].pdf && citekey && typeof state !== 'undefined' && state.pdfs) {
                     const trobat = state.pdfs.find(p => p.stem === citekey || p.filename.toLowerCase().startsWith(citekey.toLowerCase()));
                     if (trobat) {
-                        primerPdfFilename = trobat.filename;
-                        primerPageNum = page;
-                        primerCitedText = citedText;
+                        citekeyGroups[citekey].pdf = trobat.filename;
                     }
                 }
             }
@@ -2394,43 +2393,69 @@ function convertirCitacionsAPandoc(text, citations, sources, wrapHtml = false, c
 
         const citekeys = Object.keys(citekeyGroups);
         if (citekeys.length > 0) {
-            // Construir cadena Pandoc: [@citekey, p. 2; @altre, p. 5]
-            const pandocParts = citekeys.map(ck => {
-                const grp = citekeyGroups[ck];
-                const pagesArr = Array.from(grp.pages).sort((a, b) => a - b);
-                if (pagesArr.length === 1) {
-                    return `@${ck}, p. ${pagesArr[0]}`;
-                } else if (pagesArr.length > 1) {
-                    return `@${ck}, pp. ${pagesArr.join(', ')}`;
-                } else {
-                    return `@${ck}`;
-                }
-            });
-            const pandocStr = `[${pandocParts.join('; ')}]`;
-
-            if (wrapHtml) {
-                const tooltipLines = [];
-                citekeys.forEach(ck => {
+            if (!wrapHtml) {
+                // Format Pandoc net: [@citekey1, pp. 1, 2] [@citekey2, pp. 1, 7]
+                const pandocParts = citekeys.map(ck => {
                     const grp = citekeyGroups[ck];
                     const pagesArr = Array.from(grp.pages).sort((a, b) => a - b);
-                    const pStr = pagesArr.length > 0 ? ` (p. ${pagesArr.join(', ')})` : '';
-                    let tip = `📕 ${grp.title}${pStr}`;
-                    if (grp.citedTexts.length > 0) {
-                        const snippet = grp.citedTexts[0].replace(/\s+/g, ' ').slice(0, 140);
-                        tip += `\n«${snippet}...»`;
+                    if (pagesArr.length === 1) {
+                        return `[@${ck}, p. ${pagesArr[0]}]`;
+                    } else if (pagesArr.length > 1) {
+                        return `[@${ck}, pp. ${pagesArr.join(', ')}]`;
+                    } else {
+                        return `[@${ck}]`;
                     }
-                    tooltipLines.push(tip);
                 });
+                return pandocParts.join(' ');
+            }
+
+            // wrapHtml: Generar una insígnia interactiva per a CADASCUNA de les fonts citades
+            const badgesHtml = citekeys.map(ck => {
+                const grp = citekeyGroups[ck];
+                let pdfFilename = grp.pdf;
+                if (!pdfFilename && typeof state !== 'undefined' && state.pdfs) {
+                    const trobat = state.pdfs.find(p => p.stem === ck || p.filename.toLowerCase().startsWith(ck.toLowerCase()));
+                    if (trobat) pdfFilename = trobat.filename;
+                }
+                if (!pdfFilename) pdfFilename = `${ck}.pdf`;
+
+                const pagesArr = Array.from(grp.pages).sort((a, b) => a - b);
+
+                // Construir etiquetes de pàgines amb enllaç directe si n'hi ha múltiples
+                let pagesHtml = '';
+                if (pagesArr.length === 1) {
+                    const p = pagesArr[0];
+                    const cited = (grp.pageDetails[p] && grp.pageDetails[p].citedText) || grp.citedTexts[0] || '';
+                    pagesHtml = `p. <span class="nlm-page-link" data-pdf="${escapeHtml(pdfFilename)}" data-page="${p}" data-cited="${escapeHtml(cited.slice(0, 140))}" title="Saltar a la pàgina ${p} de ${escapeHtml(pdfFilename)}" style="text-decoration: underline; text-underline-offset: 2px;">${p}</span>`;
+                } else if (pagesArr.length > 1) {
+                    const pageSpans = pagesArr.map(p => {
+                        const cited = (grp.pageDetails[p] && grp.pageDetails[p].citedText) || '';
+                        return `<span class="nlm-page-link" data-pdf="${escapeHtml(pdfFilename)}" data-page="${p}" data-cited="${escapeHtml(cited.slice(0, 140))}" title="Saltar a la pàgina ${p} de ${escapeHtml(pdfFilename)}" style="text-decoration: underline; text-underline-offset: 2px; padding: 0 1px;">${p}</span>`;
+                    });
+                    pagesHtml = `pp. ${pageSpans.join(', ')}`;
+                }
+
+                const primerPage = pagesArr[0] || 1;
+                const primerCited = (grp.pageDetails[primerPage] && grp.pageDetails[primerPage].citedText) || grp.citedTexts[0] || '';
+
+                const tooltipLines = [];
+                const pStr = pagesArr.length > 0 ? ` (p. ${pagesArr.join(', ')})` : '';
+                tooltipLines.push(`📕 ${grp.title || pdfFilename}${pStr}`);
+                if (grp.citedTexts.length > 0) {
+                    const snippet = grp.citedTexts[0].replace(/\s+/g, ' ').slice(0, 140);
+                    tooltipLines.push(`«${snippet}...»`);
+                }
                 tooltipLines.push('👉 Fes clic per saltar al PDF');
                 const tooltip = tooltipLines.join('\n---\n');
 
-                const dataPdf = primerPdfFilename ? `data-pdf="${escapeHtml(primerPdfFilename)}"` : '';
-                const dataPage = `data-page="${primerPageNum}"`;
-                const dataCited = primerCitedText ? `data-cited="${escapeHtml(primerCitedText.slice(0, 140))}"` : '';
+                const dataPdf = `data-pdf="${escapeHtml(pdfFilename)}"`;
+                const dataPage = `data-page="${primerPage}"`;
+                const dataCited = primerCited ? `data-cited="${escapeHtml(primerCited.slice(0, 140))}"` : '';
 
-                return `<span class="nlm-citation-badge pandoc" ${dataPdf} ${dataPage} ${dataCited} title="${escapeHtml(tooltip)}" style="font-family: monospace; font-size: 11px; padding: 1px 6px; background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8; border-radius: 4px; cursor: pointer;"><i class="fa-solid fa-file-pdf" style="color: #ef4444; margin-right: 3px; font-size: 10px;"></i>${escapeHtml(pandocStr)}</span>`;
-            }
-            return pandocStr;
+                return `<span class="nlm-citation-badge pandoc" ${dataPdf} ${dataPage} ${dataCited} title="${escapeHtml(tooltip)}" style="display: inline-flex; align-items: center; gap: 3px; font-family: monospace; font-size: 11px; padding: 1px 6px; margin: 1px 2px; background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; border-radius: 4px; cursor: pointer;"><i class="fa-solid fa-file-pdf" style="color: #ef4444; font-size: 10px;"></i>[@${escapeHtml(ck)}${pagesHtml ? ', ' + pagesHtml : ''}]</span>`;
+            });
+
+            return badgesHtml.join(' ');
         }
 
         if (wrapHtml) {
@@ -2636,6 +2661,13 @@ function renderitzarNlmChat() {
     if (!el.nlmChatHistory._hasCitationClick) {
         el.nlmChatHistory._hasCitationClick = true;
         el.nlmChatHistory.addEventListener('click', (e) => {
+            const pageLink = e.target.closest('.nlm-page-link');
+            if (pageLink && pageLink.dataset.pdf) {
+                e.preventDefault();
+                e.stopPropagation();
+                saltarACitacioNlm(pageLink.dataset.pdf, parseInt(pageLink.dataset.page, 10) || 1, pageLink.dataset.cited || '');
+                return;
+            }
             const badge = e.target.closest('.nlm-citation-badge.pandoc');
             if (badge && badge.dataset.pdf) {
                 e.preventDefault();
@@ -4174,19 +4206,20 @@ function configurarEvents() {
                 }
             }
             
-            // Clau BibTeX: [@citekey] o [@citekey, p. 14] o [@citekey, pp. 14, 15]
-            const regexCite = /\[@([a-zA-Z0-9_-]+)(?:,\s*pp?\.?\s*(\d+))?\]/g;
+            // Clau BibTeX: [@citekey], [@citekey, p. 14], [@citekey, pp. 1, 2, 15] o múltiples [@c1, p. 1; @c2, p. 2]
+            const regexCite = /@([a-zA-Z0-9_-]+)(?:,\s*pp?\.?\s*(\d+(?:[,\s]+\d+)*))?/g;
             while ((m = regexCite.exec(txt)) !== null) {
                 if (offset >= m.index && offset <= m.index + m[0].length) {
                     const citekey = m[1].trim();
-                    const pageNum = m[2] ? m[2].trim() : null;
+                    const pageStr = m[2] ? m[2].trim() : null;
+                    const pageNum = pageStr ? pageStr.split(/[,\s]+/)[0] : null;
+                    const candPdf = state.pdfs.find(p => 
+                        p.stem === citekey || 
+                        p.filename.startsWith(citekey) ||
+                        p.filename.toLowerCase().startsWith(citekey.toLowerCase())
+                    );
+                    const pdfName = candPdf ? candPdf.filename : `${citekey}.pdf`;
                     if (pageNum) {
-                        const candPdf = state.pdfs.find(p => 
-                            p.stem === citekey || 
-                            p.filename.startsWith(citekey) ||
-                            p.filename.toLowerCase().startsWith(citekey.toLowerCase())
-                        );
-                        const pdfName = candPdf ? candPdf.filename : `${citekey}.pdf`;
                         return { tipus: 'pagina', valor: pageNum, pdf: pdfName, cerca: '', raw: m[0] };
                     }
                     return { tipus: 'nota', valor: '@' + citekey, raw: m[0] };
