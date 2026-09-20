@@ -2443,8 +2443,6 @@ function convertirCitacionsAPandoc(text, citations, sources, wrapHtml = false, c
 function formatMarkdownNlm(text, citations = null, sources = null, citationDetails = null) {
     if (!text) return '';
     let html = escapeHtml(text);
-    // Citacions en format Pandoc interactiu
-    html = convertirCitacionsAPandoc(html, citations, sources, true, citationDetails);
     // Negreta: **text**
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     // Cursiva: *text*
@@ -2460,6 +2458,8 @@ function formatMarkdownNlm(text, citations = null, sources = null, citationDetai
     // Paràgrafs
     html = html.replace(/\n\n+/g, '</p><p style="margin: 6px 0;">');
     html = html.replace(/\n/g, '<br>');
+    // Citacions en format Pandoc interactiu (al final perquè el tooltip mantingui salts de línia nets sense <br>)
+    html = convertirCitacionsAPandoc(html, citations, sources, true, citationDetails);
     return `<p style="margin: 3px 0;">${html}</p>`;
 }
 
