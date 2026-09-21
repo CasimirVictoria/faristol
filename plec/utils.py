@@ -186,21 +186,39 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str
         return False
 
     import time
+    import hashlib
     now = time.time()
     target_path.parent.mkdir(parents=True, exist_ok=True)
+    fonts_dir = target_path.parent
 
     def _strip_accents(text: str) -> str:
         return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
 
     doi_clean = re.sub(r"[^a-zA-Z0-9]", "", doi.split("/")[-1] if "/" in doi else doi).lower()
+    clean_target_doi = doi.lower().replace("https://doi.org/", "").strip() if doi else ""
     clean_full_title = re.sub(r"[^a-z0-9]", "", _strip_accents(title).lower()) if title else ""
-    main_title = re.split(r"[:\-\?]", title)[0].strip() if title else ""
+    # Només dividir per dos punts (:), mai per guió (-) per evitar tallar compostos com AI-driven o multi-level
+    main_title = title.split(":")[0].strip() if ":" in title else title.strip()
     clean_main_title = re.sub(r"[^a-z0-9]", "", _strip_accents(main_title).lower()) if main_title else ""
+
+    # Obtenir els hashes dels PDFs ja existents a la biblioteca
+    existing_hashes = set()
+    for ext_pdf in fonts_dir.glob("*.pdf"):
+        if ext_pdf.name != target_path.name:
+            try:
+                existing_hashes.add(hashlib.md5(ext_pdf.read_bytes()).hexdigest())
+            except Exception:
+                pass
 
     for p in downloads_dir.glob("*.pdf"):
         try:
             mtime = p.stat().st_mtime
             if now - mtime > 28800:  # 8 hores
+                continue
+
+            # Si el PDF de Downloads ja pertany a un altre document de la biblioteca, descartar-lo!
+            p_bytes = p.read_bytes()
+            if hashlib.md5(p_bytes).hexdigest() in existing_hashes:
                 continue
 
             fname_clean = re.sub(r"[^a-zA-Z0-9]", "", _strip_accents(p.name).lower())
@@ -211,19 +229,29 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str
                 return True
 
             # 2. Coincidència de nom de fitxer amb el títol (ex: Dialnet-CreativityAndArtificialIntelligence...)
-            if len(clean_main_title) >= 12 and clean_main_title[:20] in fname_clean:
+            if len(clean_main_title) >= 15 and clean_main_title[:20] in fname_clean:
                 shutil.copy2(p, target_path)
                 return True
 
             # 3. Coincidència estricta de frase al contingut de la primera pàgina
-            if len(clean_main_title) >= 12:
-                res = subprocess.run(["pdftotext", "-l", "1", str(p), "-"], capture_output=True, text=True, timeout=2)
-                if res.returncode == 0:
-                    clean_pdf = re.sub(r"[^a-z0-9]", "", _strip_accents(res.stdout).lower())
-                    if (clean_full_title and len(clean_full_title) >= 15 and clean_full_title in clean_pdf) or \
-                       (clean_main_title in clean_pdf):
-                        shutil.copy2(p, target_path)
-                        return True
+            res = subprocess.run(["pdftotext", "-l", "1", str(p), "-"], capture_output=True, text=True, timeout=2)
+            if res.returncode == 0:
+                raw_page1 = res.stdout
+                clean_pdf = re.sub(r"[^a-z0-9]", "", _strip_accents(raw_page1).lower())
+
+                # Comprovació de conflicte de DOI: si el PDF conté un DOI diferent al demanat, descartar
+                if clean_target_doi:
+                    pdf_dois = [d.rstrip(".,;)>]").lower() for d in re.findall(r"\b10\.\d{4,9}/[^\s\"<>]+", raw_page1)]
+                    if pdf_dois and not any(clean_target_doi == d or d in clean_target_doi for d in pdf_dois):
+                        continue
+
+                if (clean_full_title and len(clean_full_title) >= 15 and clean_full_title in clean_pdf):
+                    shutil.copy2(p, target_path)
+                    return True
+
+                if (clean_main_title and len(clean_main_title) >= 20 and clean_main_title in clean_pdf):
+                    shutil.copy2(p, target_path)
+                    return True
         except Exception:
             continue
 
