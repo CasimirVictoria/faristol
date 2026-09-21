@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""
+Faristol CLI - Banc de treball per a lectura de PDFs, notes i síntesi bibliogràfica.
+"""
+import os
+import sys
+import socket
+import argparse
+import subprocess
+import webbrowser
+import threading
+import time
+import urllib.parse
+from pathlib import Path
+
+# Afegir el directori arrel del paquet al sys.path
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from faristol.config import FONTS_DIR, NOTAS_DIR
+
+def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex((host, port)) == 0
+
+def find_available_port(preferred_port=8080) -> int:
+    port = preferred_port
+    while is_port_in_use(port):
+        port += 1
+    return port
+
+def obrir_navegador(url: str):
+    time.sleep(1.0)
+    print(f"\n🌐 Obrint Faristol a: {url}\n")
+    try:
+        env = dict(os.environ)
+        if "WAYLAND_DISPLAY" not in env:
+            env["WAYLAND_DISPLAY"] = "wayland-0"
+        if "DISPLAY" not in env:
+            env["DISPLAY"] = ":0"
+        subprocess.Popen(["xdg-open", url], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            print(f"Avís: No s'ha pogut obrir el navegador automàticament: {e}")
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Faristol: Banc de treball de lectura de PDFs, anotació i notes bibliogràfiques."
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        default=None,
+        help="Fitxer PDF o nota Markdown/Org per obrir directament."
+    )
+    parser.add_argument(
+        "-p", "--port",
+        type=int,
+        default=8080,
+        help="Port HTTP per defecte (per defecte: 8080)."
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="No obrir el navegador automàticament."
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Adreça d'escolta (per defecte: 127.0.0.1)."
+    )
+
+    args = parser.parse_args()
+
+    # Construir paràmetres de consulta si s'ha indicat un fitxer
+    query_param = ""
+    if args.target:
+        p = Path(args.target)
+        if p.suffix.lower() == ".pdf":
+            # Si el fitxer no està a FONTS_DIR, copiar-lo o referenciar-lo
+            if p.is_file() and not (FONTS_DIR / p.name).exists():
+                import shutil
+                try:
+                    shutil.copy2(str(p.resolve()), str(FONTS_DIR / p.name))
+                    print(f"📄 S'ha copiat {p.name} a {FONTS_DIR}")
+                except Exception as e:
+                    print(f"Avís copiant PDF: {e}")
+            query_param = f"?pdf={urllib.parse.quote(p.name)}"
+        elif p.suffix.lower() in [".md", ".org"]:
+            if p.is_file() and not (NOTAS_DIR / p.name).exists():
+                import shutil
+                try:
+                    shutil.copy2(str(p.resolve()), str(NOTAS_DIR / p.name))
+                    print(f"📝 S'ha copiat {p.name} a {NOTAS_DIR}")
+                except Exception as e:
+                    print(f"Avís copiant nota: {e}")
+            query_param = f"?doc={urllib.parse.quote(p.name)}"
+
+    port = args.port
+    port_ocupat = is_port_in_use(port, host=args.host)
+
+    # Si ja hi ha un Faristol corrent al port, simplement obrir el navegador a la URL i sortir
+    if port_ocupat:
+        url = f"http://{args.host}:{port}/{query_param}"
+        print(f"ℹ️ Faristol ja s'està executant al port {port}.")
+        if not args.no_browser:
+            obrir_navegador(url)
+        return
+
+    # Si no està corrent, preparar URL i llançar uvicorn
+    url = f"http://{args.host}:{port}/{query_param}"
+    if not args.no_browser:
+        threading.Thread(target=obrir_navegador, args=(url,), daemon=True).start()
+
+    print(f"🚀 Iniciant servidor Faristol a http://{args.host}:{port}...")
+    import uvicorn
+    uvicorn.run("faristol.server:app", host=args.host, port=port, log_level="info")
+
+if __name__ == "__main__":
+    main()

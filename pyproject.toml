@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "plec"
+name = "faristol"
 version = "1.0.0"
-description = "Banc de treball lliure per a la lectura, anotació de PDFs i síntesi bibliogràfica"
+description = "Faristol: Banc de treball lliure per a la lectura, anotació de PDFs i síntesi bibliogràfica"
 readme = "README.md"
 authors = [
     { name = "Casimir" }
@@ -21,11 +21,13 @@ dependencies = [
 ]
 
 [project.scripts]
-plec = "plec.bin.plec:main"
+faristol = "faristol.bin.faristol:main"
+plec = "faristol.bin.faristol:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["plec*"]
+include = ["faristol*"]
 
 [tool.setuptools.package-data]
-"plec" = ["static/**/*"]
+"faristol" = ["static/**/*"]
+

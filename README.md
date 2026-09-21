@@ -1,4 +1,4 @@
-# 📖 Plec
+# 📖 Faristol
 
 > **Banc de treball lliure per a la lectura de PDFs, anotació i síntesi bibliogràfica.**  
 > *Inspirat en Org-Noter, Zotero, Better BibTeX, Better Notes i ZotMoov.*  
@@ -6,13 +6,13 @@
 
 ---
 
-## 🧭 Què és Plec?
+## 🧭 Què és Faristol?
 
-**Plec** és una estació de treball acadèmica i entorn de lectura (*reading workbench*) dissenyada per a investigadors, docents i estudiants que volen llegir documents en PDF, prendre notes estructurades i sintetitzar coneixement sense dependre de formats propietaris ni bases de dades tancades (com SQLite o núvols privatius).
+**Faristol** és una estació de treball acadèmica i entorn de lectura (*reading workbench*) dissenyada per a investigadors, docents i estudiants que volen llegir documents en PDF, prendre notes estructurades i sintetitzar coneixement sense dependre de formats propietaris ni bases de dades tancades (com SQLite o núvols privatius).
 
-El nom prové del català **plec** (*plec de paper, plec de documents, plecs de lectura*): la unitat bàsica on s'organitza i s'anota el saber.
+El nom prové del mot genuí **faristol** (*el moble o suport inclinat on es col·loca el llibre obert per poder llegir còmodament i prendre notes alhora sense haver d'aguantar-lo amb les mans*): el nostre faristol digital sosté el document PDF davant dels teus ulls mentre prens notes i reflexiones lliurement en el teu quadern de recerca.
 
-Plec presenta una interfície web moderna de **tres plafons sincronitzats**:
+Faristol presenta una interfície web moderna de **tres plafons sincronitzats**:
 1. **Plafó lateral de navegació i cerca:** Carpetes i col·leccions virtuals, explorador de notes, explorador de PDFs de la biblioteca, xat d'IA integrat amb NotebookLM i cerca acadèmica federada en 18 bases de dades.
 2. **Visor de PDF central (PDF.js personalitzat):** Renderitzat fluid, subratllat persistent, cerca exacta multilínia, navegació per pàgines i extracció automàtica d'anotacions.
 3. **Editor de notes (Vditor Markdown):** Editor WYSIWYG/Markdown amb suport complet per a KaTeX (fórmules matemàtiques), etiquetes `#tags`, retroenllaços bidireccionals (*backlinks/outlinks*), citacions Pandoc `[@citekey, p. X]` i salts instantanis a la pàgina exacta del PDF.
@@ -21,11 +21,11 @@ Plec presenta una interfície web moderna de **tres plafons sincronitzats**:
 
 ## 💡 Inspiracions i Llinatge
 
-Plec no neix del no-res; sintetitza les millors idees del programari lliure acadèmic dels darrers vint anys en una arquitectura moderna basada en la web i en fitxers plans:
+Faristol no neix del no-res; sintetitza les millors idees del programari lliure acadèmic dels darrers vint anys en una arquitectura moderna basada en la web i en fitxers plans:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│                          INSPIRACIONS DE PLEC                             │
+│                        INSPIRACIONS DE FARISTOL                           │
 ├───────────────────────────────────────────────────────────────────────────┤
 │ 1. Org-Noter (Emacs)       │ Lectura sincronitzada PDF ↔ Notes a dos plafons│
 │ 2. Zotero & Connector      │ Captura d'articles al navegador en 1 clic    │
@@ -36,7 +36,7 @@ Plec no neix del no-res; sintetitza les millors idees del programari lliure acad
 ```
 
 1. **Org-Noter (Emacs):**  
-   El paquet llegendari d'Emacs que va inventar la lectura sincronitzada entre un document (PDF/EPUB) i un document de notes, permetent saltar entre el text de la nota i la ubicació exacta del PDF. Plec modernitza aquesta experiència per a la web amb Markdown estàndard, citacions Pandoc (`[@citekey, p. 12]`) i concordança exacta de text multilínia.
+   El paquet llegendari d'Emacs que va inventar la lectura sincronitzada entre un document (PDF/EPUB) i un document de notes, permetent saltar entre el text de la nota i la ubicació exacta del PDF. Faristol modernitza aquesta experiència per a la web amb Markdown estàndard, citacions Pandoc (`[@citekey, p. 12]`) i concordança exacta de text multilínia.
 2. **Zotero & Zotero Connector:**  
    Aprofitem el connector oficial de Zotero per a Firefox i Chrome gràcies a l'emulació de [zoterless](https://github.com/CasimirVictoria/zoterless), que respon al port local `23119` sense necessitat de tindre Zotero Desktop obert.
 3. **Better BibTeX (BBT):**  
@@ -48,26 +48,26 @@ Plec no neix del no-res; sintetitza les millors idees del programari lliure acad
 
 ---
 
-## 🏛️ L'Ecosistema: Plec + zoterless + academic-spain
+## 🏛️ L'Ecosistema: Faristol + zoterless + academic-spain
 
-Plec és la cara visual d'un ecosistema modular basat en la filosofia UNIX (*cada eina fa una cosa i la fa bé*):
+Faristol és la cara visual d'un ecosistema modular basat en la filosofia UNIX (*cada eina fa una cosa i la fa bé*):
 
 ```mermaid
 flowchart TD
     subgraph Fonts ["1. INGESTA & CERCA"]
         Web["Navegador (Firefox)"] -->|Zotero Connector| ZL["zoterless (Port 23119)"]
         CLI["add-paper (CLI)"] --> ZL
-        AS["mcp-server-academic-spain (18 motors)"] -->|Resultats OA| Plec
+        AS["mcp-server-academic-spain (18 motors)"] -->|Resultats OA| FaristolApp
     end
 
     subgraph Storage ["2. FONT DE VERITAT (Text Pla)"]
         Bib["~/Documents/Biblioteca/biblioteca.bib"]
         PDFs["~/Documents/Biblioteca/pdfs/{citekey}.pdf"]
         Notes["~/Documents/notes/@{citekey}.md"]
-        Colls["~/.config/plec/collections.json"]
+        Colls["~/.config/faristol/collections.json"]
     end
 
-    subgraph PlecApp ["3. PLEC WORKBENCH (FastAPI + Web)"]
+    subgraph FaristolApp ["3. FARISTOL WORKBENCH (FastAPI + Web)"]
         Sidebar["Plafó Lateral (Col·leccions, Notes, PDFs, Cerca, NotebookLM)"]
         Viewer["Plafó Central (PDF.js + Exact Text Search)"]
         Editor["Plafó Dret (Vditor Markdown + Cites Pandoc)"]
@@ -77,16 +77,16 @@ flowchart TD
     ZL -->|Descarrega PDF| PDFs
     ZL -->|Genera nota| Notes
 
-    Bib <--> PlecApp
-    PDFs <--> PlecApp
-    Notes <--> PlecApp
-    Colls <--> PlecApp
+    Bib <--> FaristolApp
+    PDFs <--> FaristolApp
+    Notes <--> FaristolApp
+    Colls <--> FaristolApp
 ```
 
 ### Divisió de responsabilitats:
 - **`zoterless`:** El dimoni de captura en segon pla. Rep les crides del Zotero Connector, cerca el PDF en accés obert (Unpaywall multi-ubicació, OpenAlex, repositoris OJS/DSpace), genera la citekey BBT, actualitza `biblioteca.bib` i crea la nota `@citekey.md`.
 - **`mcp-server-academic-spain`:** El motor de cerca acadèmica federada. Realitza consultes en paral·lel a 18 plataformes (Dialnet, OpenAlex, ERIC, CSIC, arXiv, PubMed, SciELO, DOAJ, Recolecta, TDR, etc.) amb suport per a EduVPN.
-- **`Plec`:** El banc de treball unificat on llegeixes el PDF, prens notes al costat, consultes la IA de Google NotebookLM sobre els teus documents i gestiones les teues col·leccions virtuals.
+- **`Faristol`:** El banc de treball unificat on llegeixes el PDF, prens notes al costat, consultes la IA de Google NotebookLM sobre els teus documents i gestiones les teues col·leccions virtuals.
 
 ---
 
@@ -99,7 +99,7 @@ flowchart TD
 
 ### 2. Visor PDF.js d'alta precisió
 - Cerca de text multilínia millorada: troba frases que creuen salts de línia o guionets de paraula.
-- Subratllats persistents desats a disc (`~/.config/plec/highlights.json`).
+- Subratllats persistents desats a disc (`~/.config/faristol/highlights.json`).
 - Extracció d'anotacions natives i subratllats existents amb PyMuPDF (`fitz`).
 
 ### 3. Editor Markdown ric (Vditor)
@@ -118,7 +118,7 @@ flowchart TD
 - Connecta les teues col·leccions de documents directament amb NotebookLM mitjançant el CLI oficial `nlm`.
 - Fes preguntes complexes sobre el conjunt de documents de la col·lecció.
 - Les respostes inclouen citacions amb enllaços directes que obren el PDF corresponent a la pàgina de la font.
-- Injecta la síntesi de la IA directament a la teua nota amb el botó "Injectar a la nota".
+- Injecta la síntesi de la IA directament a la teua nota amb el botó "Injectar a la nota" o exporta en Markdown pur amb cites acadèmiques.
 
 ### 6. Col·leccions Virtuals
 - Organitza la teua biblioteca en carpetes temàtiques i subcarpetes jeràrquiques sense moure els fitxers de disc.
@@ -129,7 +129,7 @@ flowchart TD
 
 ## 📁 Estructura de Fitxers Canònica
 
-Plec opera exclusivament sobre la teua estructura de documents estàndard:
+Faristol opera exclusivament sobre la teua estructura de documents estàndard:
 
 ```text
 ~/Documents/
@@ -146,14 +146,14 @@ Plec opera exclusivament sobre la teua estructura de documents estàndard:
 
 Configuració i metadades auxiliars:
 ```text
-~/.config/plec/
+~/.config/faristol/
 ├── collections.json            # Arbre de col·leccions virtuals
 └── highlights.json             # Subratllats de lectura persistents
 ```
 
 ### 🏷️ La Convenció de l'Arroba (`@`): Notes Bibliogràfiques vs. Notes Pròpies
 
-Al directori `~/Documents/notes/`, Plec i el seu ecosistema distingeixen de forma fonamental dues tipologies de notes mitjançant el prefix del fitxer:
+Al directori `~/Documents/notes/`, Faristol i el seu ecosistema distingeixen de forma fonamental dues tipologies de notes mitjançant el prefix del fitxer:
 
 | Tipus de Nota | Nomenclatura del fitxer | Descripció i Propòsit | Exemple |
 | :--- | :--- | :--- | :--- |
@@ -161,8 +161,8 @@ Al directori `~/Documents/notes/`, Plec i el seu ecosistema distingeixen de form
 | **Nota Pròpia / Permanent** *(Evergreen / Atomic Note)* | **`{timestamp}--{slug}_{tags}.md`** o **`{slug}.md`** *(sense arroba)* | Nota de pensament propi elaborada totalment per nosaltres. Desenvolupa un concepte, tesi, hipòtesi o argument personal (seguint Denote o Zettelkasten). Enllaça cap a les fonts usant `[[@citekey]]` o cites Pandoc `[@citekey, p. 12]`. | `20260920T120000--didactica-de-la-fisica_ciencies.md` |
 
 > **Per què aquesta distinció és crucial?**  
-> 1. **Diferenciació visual i conceptual immediata:** Amb un cop d'ull a la carpeta de notes o a l'arbre lateral de Plec, saps a l'instant si estàs llegint la síntesi d'un autor extern (`@...`) o una idea original teua.  
-> 2. **Vinculació automàtica 1:1:** Plec i `zoterless` aprofiten el patró `@{citekey}.md` per obrir automàticament el PDF corresponent `{citekey}.pdf` al visor central i resoldre les metadades de `biblioteca.bib`.  
+> 1. **Diferenciació visual i conceptual immediata:** Amb un cop d'ull a la carpeta de notes o a l'arbre lateral de Faristol, saps a l'instant si estàs llegint la síntesi d'un autor extern (`@...`) o una idea original teua.  
+> 2. **Vinculació automàtica 1:1:** Faristol i `zoterless` aprofiten el patró `@{citekey}.md` per obrir automàticament el PDF corresponent `{citekey}.pdf` al visor central i resoldre les metadades de `biblioteca.bib`.  
 > 3. **Claredat epistèmica en la investigació:** Evita la confusió freqüent en el treball acadèmic entre el que diu la literatura científica i el que constitueix la teua pròpia aportació o anàlisi.
 
 ---
@@ -178,39 +178,39 @@ Al directori `~/Documents/notes/`, Plec i el seu ecosistema distingeixen de form
 
 ```bash
 # 1. Clonar el repositori
-git clone https://github.com/CasimirVictoria/plec.git ~/Projects/plec
-cd ~/Projects/plec
+git clone https://github.com/CasimirVictoria/faristol.git ~/Projects/faristol
+cd ~/Projects/faristol
 
 # 2. Instal·lar dependències
 pip install -r requirements.txt
 
 # 3. Enllaçar l'executable al teu PATH
-ln -sf ~/Projects/plec/bin/plec ~/.local/bin/plec
+ln -sf ~/Projects/faristol/bin/faristol ~/.local/bin/faristol
 ```
 
 ### Execució
 
 ```bash
-# Iniciar Plec i obrir el navegador automàticament (port 8080)
-plec
+# Iniciar Faristol i obrir el navegador automàticament (port 8080)
+faristol
 
-# Obrir un PDF directament a Plec
-plec paper.pdf
-plec ~/Documents/Biblioteca/pdfs/berzosaPensamentComputacional2024.pdf
+# Obrir un PDF directament a Faristol
+faristol paper.pdf
+faristol ~/Documents/Biblioteca/pdfs/berzosaPensamentComputacional2024.pdf
 
-# Obrir una nota directament a Plec
-plec @berzosaPensamentComputacional2024.md
+# Obrir una nota directament a Faristol
+faristol @berzosaPensamentComputacional2024.md
 
 # Especificar un port alternatiu
-plec --port 8090
+faristol --port 8090
 
 # Executar en mode servidor sense obrir el navegador
-plec --no-browser
+faristol --no-browser
 ```
 
 ---
 
-## ⌨️ Dreceres de Teclat a Plec
+## ⌨️ Dreceres de Teclat a Faristol
 
 | Drecera | Acció |
 | :--- | :--- |
