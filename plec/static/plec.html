@@ -3453,24 +3453,28 @@ async function obrirPdf(filename, obrirNotaAssociada = true, paginaInicial = 1, 
     
     // Carregar directament a l'iframe amb el visor oficial de Mozilla PDF.js amb cache-buster i auto-guardat
     const streamUrl = `/api/pdf/stream?path=${encodeURIComponent(filename)}&_t=${Date.now()}`;
-    const pageHash = (paginaInicial && paginaInicial > 1) ? `#page=${paginaInicial}` : '';
+    const pageHash = (paginaInicial && paginaInicial > 1) ? `#page=${paginaInicial}&zoom=page-width` : '#zoom=page-width';
     const viewerUrl = `/static/libs/pdfjs_dist/web/viewer.html?file=${encodeURIComponent(streamUrl)}&nom_pdf=${encodeURIComponent(filename)}${pageHash}`;
     el.pdfFrame.src = viewerUrl;
     el.pdfFrame.onload = () => {
         vincularEventsIframePdf();
-        if (paginaInicial || textDeCerca) {
-            let count = 0;
-            const checkReady = setInterval(() => {
-                count++;
-                if (el.pdfFrame && el.pdfFrame.contentWindow && el.pdfFrame.contentWindow.PDFViewerApplication && el.pdfFrame.contentWindow.PDFViewerApplication.pagesCount > 0) {
-                    clearInterval(checkReady);
+        let count = 0;
+        const checkReady = setInterval(() => {
+            count++;
+            if (el.pdfFrame && el.pdfFrame.contentWindow && el.pdfFrame.contentWindow.PDFViewerApplication && el.pdfFrame.contentWindow.PDFViewerApplication.pagesCount > 0) {
+                clearInterval(checkReady);
+                const app = el.pdfFrame.contentWindow.PDFViewerApplication;
+                if (app.pdfViewer && (!app.pdfViewer.currentScaleValue || app.pdfViewer.currentScaleValue === 'auto')) {
+                    app.pdfViewer.currentScaleValue = 'page-width';
+                }
+                if (paginaInicial || textDeCerca) {
                     setTimeout(() => {
                         saltarAPaginaPdf(paginaInicial, textDeCerca);
-                    }, 250);
+                    }, 200);
                 }
-                if (count > 60) clearInterval(checkReady);
-            }, 100);
-        }
+            }
+            if (count > 60) clearInterval(checkReady);
+        }, 100);
     };
     
     // Assegurar que el panell central està visible

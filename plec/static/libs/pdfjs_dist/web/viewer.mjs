@@ -26,7 +26,7 @@
  */
 
 ;// ./web/ui_utils.js
-const DEFAULT_SCALE_VALUE = "auto";
+const DEFAULT_SCALE_VALUE = "page-width";
 const DEFAULT_SCALE = 1.0;
 const DEFAULT_SCALE_DELTA = 1.1;
 const MIN_SCALE = 0.1;
@@ -604,7 +604,7 @@ const defaultOptions = new Map([["allowedGlobalEvents", {
   value: 400,
   kind: OptionKind.VIEWER + OptionKind.PREFERENCE
 }], ["defaultZoomValue", {
-  value: "",
+  value: "page-width",
   kind: OptionKind.VIEWER + OptionKind.PREFERENCE
 }], ["disableHistory", {
   value: false,
@@ -15735,7 +15735,7 @@ class PDFViewer {
       if (scale && scale !== this._currentScale) {
         this.currentScaleValue = scale;
       } else if (this._currentScale === (/* inlined export .UNKNOWN_SCALE */0)) {
-        this.currentScaleValue = (/* inlined export .DEFAULT_SCALE_VALUE */"auto");
+        this.currentScaleValue = (/* inlined export .DEFAULT_SCALE_VALUE */"page-width");
       }
     }
     if (scale === "page-fit" && !destArray[4]) {
@@ -18230,7 +18230,7 @@ class Toolbar {
     this.pageLabel = null;
     this.hasPageLabels = false;
     this.pagesCount = 0;
-    this.pageScaleValue = (/* inlined export .DEFAULT_SCALE_VALUE */"auto");
+    this.pageScaleValue = (/* inlined export .DEFAULT_SCALE_VALUE */"page-width");
     this.pageScale = (/* inlined export .DEFAULT_SCALE */1);
     this.#updateUIState(true);
     this.updateLoadingIndicatorState();
@@ -19392,7 +19392,7 @@ const PDFViewerApplication = {
     if (this.pdfViewer.isInPresentationMode) {
       return;
     }
-    this.pdfViewer.currentScaleValue = (/* inlined export .DEFAULT_SCALE_VALUE */"auto");
+    this.pdfViewer.currentScaleValue = (/* inlined export .DEFAULT_SCALE_VALUE */"page-width");
   },
   touchPinchCallback(origin, prevDistance, distance, panX, panY) {
     const pan = [panX, panY];
@@ -19765,7 +19765,7 @@ const PDFViewerApplication = {
     this.pdfThumbnailViewer?.setDocument(pdfDocument);
     const storedPromise = (this.store = new ViewHistory(pdfDocument.fingerprints[0])).getMultiple({
       page: null,
-      zoom: (/* inlined export .DEFAULT_SCALE_VALUE */"auto"),
+      zoom: (/* inlined export .DEFAULT_SCALE_VALUE */"page-width"),
       scrollLeft: "0",
       scrollTop: "0",
       rotation: null,
@@ -20193,7 +20193,7 @@ const PDFViewerApplication = {
     }
     this.toolbar?.setPageNumber(this.pdfViewer.currentPageNumber, this.pdfViewer.currentPageLabel);
     this.secondaryToolbar?.setPageNumber(this.pdfViewer.currentPageNumber);
-    this.pdfViewer.currentScaleValue ||= (/* inlined export .DEFAULT_SCALE_VALUE */"auto");
+    this.pdfViewer.currentScaleValue ||= (/* inlined export .DEFAULT_SCALE_VALUE */"page-width");
   },
   _cleanup() {
     if (!this.pdfDocument) {
