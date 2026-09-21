@@ -20152,6 +20152,38 @@ const PDFViewerApplication = {
         console.error("Error guardant anotacions del PDF:", err);
       }
     };
+    this.plecHighlightSelection = async (savedRange = null) => {
+      try {
+        const uiManager = this.pdfViewer?._layerProperties?.annotationEditorUIManager;
+        if (!uiManager) return false;
+        let sel = document.getSelection();
+        if ((!sel || sel.isCollapsed || !sel.rangeCount) && savedRange) {
+          try {
+            sel.removeAllRanges();
+            sel.addRange(savedRange);
+          } catch(eSel) {}
+          sel = document.getSelection();
+        }
+        if (!sel || sel.isCollapsed) return false;
+        if (typeof uiManager.highlightSelection === 'function') {
+          uiManager.highlightSelection('toolbar');
+          setTimeout(() => {
+            try {
+              if (this.eventBus) {
+                this.eventBus.dispatch("switchannotationeditormode", {
+                  source: this,
+                  mode: 0
+                });
+              }
+            } catch(e) {}
+          }, 150);
+          return true;
+        }
+      } catch (err) {
+        console.warn("Avís ressaltant selecció a Plec:", err);
+      }
+      return false;
+    };
     annotationStorage.onResetModified = () => {
       delete this._annotationStorageModified;
     };

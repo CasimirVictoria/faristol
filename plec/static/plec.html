@@ -3556,6 +3556,7 @@ function vincularEventsIframePdf() {
                         pag = cw.PDFViewerApplication.page;
                     }
 
+                    estatSeleccioPdf = { text, page: pag, range: range.cloneRange() };
                     mostrarMenuFlotantPdf(rect, text, pag);
                 } catch(e) {
                     console.error("Error al comprovar selecció PDF:", e);
@@ -3604,7 +3605,8 @@ function mostrarMenuFlotantPdf(rect, text, pag) {
     const menu = document.getElementById('pdf-floating-menu');
     if (!menu || !el.pdfFrame) return;
 
-    estatSeleccioPdf = { text: text, page: pag };
+    estatSeleccioPdf.text = text;
+    estatSeleccioPdf.page = pag;
 
     const iframeRect = el.pdfFrame.getBoundingClientRect();
     const menuWidth = 260;
@@ -3631,6 +3633,40 @@ function amagarMenuFlotantPdf() {
     const menu = document.getElementById('pdf-floating-menu');
     if (menu) {
         menu.style.display = 'none';
+    }
+}
+
+function resaltarSeleccioAlPdf() {
+    try {
+        if (!el.pdfFrame || !el.pdfFrame.contentWindow) return;
+        const cw = el.pdfFrame.contentWindow;
+        const app = cw.PDFViewerApplication;
+        if (!app) return;
+
+        if (typeof app.plecHighlightSelection === 'function') {
+            app.plecHighlightSelection(estatSeleccioPdf.range);
+        } else {
+            const uiManager = app.pdfViewer?._layerProperties?.annotationEditorUIManager;
+            if (uiManager && typeof uiManager.highlightSelection === 'function') {
+                const sel = cw.document.getSelection();
+                if ((!sel || sel.isCollapsed) && estatSeleccioPdf.range) {
+                    try {
+                        sel.removeAllRanges();
+                        sel.addRange(estatSeleccioPdf.range);
+                    } catch(e) {}
+                }
+                uiManager.highlightSelection('toolbar');
+                setTimeout(() => {
+                    try {
+                        if (app.eventBus) {
+                            app.eventBus.dispatch("switchannotationeditormode", { source: app, mode: 0 });
+                        }
+                    } catch(e) {}
+                }, 150);
+            }
+        }
+    } catch(err) {
+        console.warn("Avís ressaltant selecció al PDF:", err);
     }
 }
 
@@ -4427,6 +4463,10 @@ function configurarEvents() {
         btnFloatIdea.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            // 1. Ressaltar en groc la selecció directament al PDF
+            resaltarSeleccioAlPdf();
+
             amagarMenuFlotantPdf();
             if (!estatSeleccioPdf.text) return;
 
@@ -4448,7 +4488,7 @@ function configurarEvents() {
             }
             state.pendingNoteContent = contingut;
             await guardarNotaActual();
-            actualitzarEstatGuardat('saved', 'Idea clau desada');
+            actualitzarEstatGuardat('saved', 'Idea clau desada i ressaltada');
         };
     }
 
