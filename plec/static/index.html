@@ -177,6 +177,7 @@
             align-items: center;
             justify-content: center;
             gap: 5px;
+            white-space: nowrap;
         }
 
         .tab-btn.active {
@@ -1191,11 +1192,11 @@
                     <button class="tab-btn" id="tab-collections-btn" title="Col·leccions virtuals (estil Zotero)">
                         <i class="fa-solid fa-folder-tree"></i> <span>Carpetes</span>
                     </button>
-                    <button class="tab-btn active" id="tab-notes-btn">
-                        <i class="fa-regular fa-note-sticky"></i> Notes (<span id="notes-count">0</span>)
+                    <button class="tab-btn active" id="tab-notes-btn" title="Notes de la biblioteca">
+                        <i class="fa-regular fa-note-sticky"></i> <span>Notes</span>
                     </button>
-                    <button class="tab-btn" id="tab-pdfs-btn">
-                        <i class="fa-solid fa-book"></i> PDFs (<span id="pdfs-count">0</span>)
+                    <button class="tab-btn" id="tab-pdfs-btn" title="Documents PDF">
+                        <i class="fa-solid fa-book"></i> <span>PDFs</span>
                     </button>
                     <button class="tab-btn" id="tab-notebooklm-btn" title="Consultes a NotebookLM (IA)">
                         <i class="fa-solid fa-brain" style="color: #38bdf8;"></i> <span>IA</span>
@@ -2011,8 +2012,10 @@ async function carregarDadesBiblioteca() {
         state.pdfs = fontsData.fonts || [];
         state.collections = colsData.collections || [];
         
-        el.notesCount.textContent = state.notes.length;
-        el.pdfsCount.textContent = state.pdfs.length;
+        if (el.notesCount) el.notesCount.textContent = state.notes.length;
+        if (el.pdfsCount) el.pdfsCount.textContent = state.pdfs.length;
+        if (el.tabNotesBtn) el.tabNotesBtn.title = `Notes (${state.notes.length})`;
+        if (el.tabPdfsBtn) el.tabPdfsBtn.title = `PDFs (${state.pdfs.length})`;
         el.libraryStatus.textContent = `${state.collections.length} carpetes · ${state.notes.length} notes · ${state.pdfs.length} PDFs`;
         
         renderitzarTags();
