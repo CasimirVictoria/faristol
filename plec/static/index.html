@@ -2399,14 +2399,15 @@ function convertirCitacionsAPandoc(text, citations, sources, wrapHtml = false, c
             if (!wrapHtml) {
                 // Format Pandoc net: [@citekey1, pp. 1, 2] [@citekey2, pp. 1, 7]
                 const pandocParts = citekeys.map(ck => {
+                    const cleanCk = ck.replace(/^@+/, '');
                     const grp = citekeyGroups[ck];
                     const pagesArr = Array.from(grp.pages).sort((a, b) => a - b);
                     if (pagesArr.length === 1) {
-                        return `[@${ck}, p. ${pagesArr[0]}]`;
+                        return `[@${cleanCk}, p. ${pagesArr[0]}]`;
                     } else if (pagesArr.length > 1) {
-                        return `[@${ck}, pp. ${pagesArr.join(', ')}]`;
+                        return `[@${cleanCk}, pp. ${pagesArr.join(', ')}]`;
                     } else {
-                        return `[@${ck}]`;
+                        return `[@${cleanCk}]`;
                     }
                 });
                 return pandocParts.join(' ');
@@ -2629,24 +2630,32 @@ function renderitzarNlmChat() {
                 div.appendChild(sourcesDiv);
             }
 
-            // Accions: Inserir a la nota, Copiar
+            // Accions: Crear nota, Inserir a la nota, Copiar
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'nlm-msg-actions';
+
+            const btnNewNote = document.createElement('button');
+            btnNewNote.className = 'nlm-action-btn';
+            btnNewNote.innerHTML = '<i class="fa-solid fa-file-circle-plus" style="color: #4ade80;"></i> Crear nota';
+            btnNewNote.title = 'Crear una nova nota Markdown a la biblioteca amb aquesta resposta i cites';
+            btnNewNote.onclick = () => crearNovaNotaDesDeNlm(idx);
+            actionsDiv.appendChild(btnNewNote);
 
             const btnInsert = document.createElement('button');
             btnInsert.className = 'nlm-action-btn';
             btnInsert.innerHTML = '<i class="fa-solid fa-file-import" style="color: #38bdf8;"></i> Inserir a la nota';
-            btnInsert.title = 'Inserir aquesta resposta a la nota actual en format Pandoc amb evidències';
+            btnInsert.title = 'Inserir aquesta resposta a la nota oberta en Markdown pur amb cites [@citekey, p. X] i evidències';
             btnInsert.onclick = () => inserirRespostaANota(idx);
             actionsDiv.appendChild(btnInsert);
 
             const btnCopy = document.createElement('button');
             btnCopy.className = 'nlm-action-btn';
             btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar';
+            btnCopy.title = 'Copiar la resposta completa en Markdown pur amb cites i evidències al porta-retalls';
             btnCopy.onclick = async () => {
                 try {
-                    const pandocText = convertirCitacionsAPandoc(msg.text, msg.citations, msg.sources, false, msg.citation_details);
-                    await navigator.clipboard.writeText(pandocText);
+                    const textMd = generarMarkdownPurNlm(idx, false);
+                    await navigator.clipboard.writeText(textMd);
                     btnCopy.innerHTML = '<i class="fa-solid fa-check" style="color: #4ade80;"></i> Copiat!';
                     setTimeout(() => { btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar'; }, 1500);
                 } catch(e) {
@@ -2766,36 +2775,134 @@ async function enviarNlmPregunta(text) {
     }
 }
 
+function formatarEvidenciesMarkdown(references) {
+    if (!references || references.length === 0) return '';
+    const vistes = new Set();
+    const linies = [];
+    references.forEach(ref => {
+        const textNet = (ref.cited_text || '').replace(/\s+/g, ' ').trim();
+        const pnum = ref.page || 1;
+        const citekey = (ref.citekey || 'ref').replace(/^@+/, '');
+        const key = `${citekey}_${pnum}_${textNet}`;
+        if (vistes.has(key)) return;
+        vistes.add(key);
+
+        if (textNet) {
+            linies.push(`* **[@${citekey}, p. ${pnum}]**:\n  > "${textNet}" (p. ${pnum})`);
+        } else {
+            linies.push(`* **[@${citekey}, p. ${pnum}]**`);
+        }
+    });
+    return linies.join('\n');
+}
+
+function generarMarkdownPurNlm(msgIndex, includeHeader = false) {
+    const msg = state.nlmChatMessages[msgIndex];
+    if (!msg || !msg.text) return '';
+
+    let userQuery = '';
+    if (msgIndex > 0 && state.nlmChatMessages[msgIndex - 1].role === 'user') {
+        userQuery = state.nlmChatMessages[msgIndex - 1].text.trim();
+    }
+
+    const nbTitle = state.activeNotebookTitle || 'Quadern';
+    const textFormatted = convertirCitacionsAPandoc(msg.text, msg.citations, msg.sources, false, msg.citation_details);
+    const evidenciesMd = formatarEvidenciesMarkdown(msg.references);
+
+    let md = '';
+    if (includeHeader) {
+        const headerTitle = userQuery ? `### Síntesi: ${userQuery}` : `### Síntesi (${nbTitle})`;
+        md += `${headerTitle}\n\n`;
+    }
+    md += `${textFormatted}\n`;
+
+    if (evidenciesMd) {
+        md += `\n#### Evidències i cites del PDF:\n\n${evidenciesMd}\n`;
+    }
+
+    return md;
+}
+
 function inserirRespostaANota(msgIndex) {
     const msg = state.nlmChatMessages[msgIndex];
     if (!msg || !msg.text) return;
 
-    const textFormatted = convertirCitacionsAPandoc(msg.text, msg.citations, msg.sources, false, msg.citation_details);
-    
-    // Extreure els fragments d'evidència citats
-    let evidencies = [];
-    if (msg.references && msg.references.length > 0) {
-        msg.references.forEach(ref => {
-            if (ref.cited_text) {
-                const textNet = ref.cited_text.replace(/\s+/g, ' ').trim();
-                const pnum = ref.page || 1;
-                const cite = ref.citekey ? `[@${ref.citekey}, p. ${pnum}]` : `(p. ${pnum})`;
-                evidencies.push(`> "${textNet}" (p. ${pnum})`);
-            }
-        });
+    const snippet = generarMarkdownPurNlm(msgIndex, true);
+    inserirTextAlCursor(`\n\n${snippet}\n`);
+    actualitzarEstatGuardat('unsaved', 'Resposta inserida');
+}
+
+async function crearNovaNotaDesDeNlm(msgIndex) {
+    const msg = state.nlmChatMessages[msgIndex];
+    if (!msg || !msg.text) return;
+
+    let userQuery = '';
+    if (msgIndex > 0 && state.nlmChatMessages[msgIndex - 1].role === 'user') {
+        userQuery = state.nlmChatMessages[msgIndex - 1].text.trim();
     }
 
     const nbTitle = state.activeNotebookTitle || 'Quadern';
-    let snippet = `\n\n> **NotebookLM (${nbTitle}):**\n> ${textFormatted.replace(/\n/g, '\n> ')}\n`;
-    
-    if (evidencies.length > 0) {
-        snippet += `>\n> **Evidències i fragments originals del PDF:**\n` + evidencies.map(e => `> ${e}`).join('\n>\n') + `\n\n`;
-    } else {
-        snippet += `\n\n`;
+    const defaultTitle = userQuery ? `Síntesi: ${userQuery}` : `Síntesi ${nbTitle}`;
+    const titol = prompt("Títol de la nova nota de síntesi:", defaultTitle);
+    if (!titol || !titol.trim()) return;
+
+    const titolNet = titol.trim();
+    const textFormatted = convertirCitacionsAPandoc(msg.text, msg.citations, msg.sources, false, msg.citation_details);
+    const evidenciesMd = formatarEvidenciesMarkdown(msg.references);
+
+    const avui = new Date().toISOString().slice(0, 10);
+    let contingut = `---
+title: "${titolNet.replace(/"/g, '\\"')}"
+date: ${avui}
+tags: ["sintesi", "notebooklm"]
+---
+
+# ${titolNet}
+
+${userQuery ? `> **Pregunta:** ${userQuery}\n\n` : ''}${textFormatted}
+`;
+
+    if (evidenciesMd) {
+        contingut += `\n## Evidències i cites del PDF\n\n${evidenciesMd}\n`;
     }
 
-    inserirTextAlCursor(snippet);
-    actualitzarEstatGuardat('unsaved', 'Resposta inserida');
+    try {
+        const res = await fetch('/api/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                titol: titolNet,
+                tags: "sintesi notebooklm",
+                contingut: contingut
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Error creant la nota");
+
+        const filename = data.filename;
+
+        // Si hi ha una carpeta activa, afegir-hi la nova nota
+        if (state.activeCollectionId && state.activeCollectionId !== 'unfiled') {
+            await afegirItemAColleccio(state.activeCollectionId, 'note', filename);
+        }
+
+        // Recarregar notes
+        const notesRes = await fetch('/api/notes');
+        if (notesRes.ok) {
+            const notesData = await notesRes.json();
+            state.notes = notesData.notes || [];
+            if (el.notesCount) el.notesCount.textContent = state.notes.length;
+            renderitzarLlistaNotes();
+        }
+
+        // Obrir la nova nota a l'editor i canviar a la pestanya de notes
+        await obrirNota(filename);
+        canviarPestanya('notes');
+        actualitzarEstatGuardat('saved', `Nota '${titolNet}' creada`);
+    } catch(err) {
+        console.error("Error creant nota des de NotebookLM:", err);
+        alert(`Error en crear la nota: ${err.message}`);
+    }
 }
 
 function renderitzarColleccions() {

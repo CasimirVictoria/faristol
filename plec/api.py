@@ -53,6 +53,7 @@ class NovaNotaRequest(BaseModel):
     titol: str
     tags: str = ""
     plantilla: str = "estat_art"
+    contingut: Optional[str] = None
 
 class SaveHighlightRequest(BaseModel):
     pdf_path: str
@@ -294,7 +295,10 @@ async def crear_nova_nota(req: NovaNotaRequest):
         path_fitxer = NOTAS_DIR / nom_fitxer
         if path_fitxer.exists():
             return {"status": "exists", "filename": nom_fitxer, "path": str(path_fitxer.resolve())}
-        contingut = f"""---
+        if req.contingut:
+            contingut = req.contingut
+        else:
+            contingut = f"""---
 title: "{clean_stem}"
 date: {avui}
 tags: ["lectura"]
@@ -327,7 +331,10 @@ citekey: "@{clean_stem}"
         path_fitxer = NOTAS_DIR / nom_fitxer
         contador += 1
 
-    contingut = f"""---
+    if req.contingut:
+        contingut = req.contingut
+    else:
+        contingut = f"""---
 title: "{titol_clean}"
 date: {avui}
 tags: {json.dumps(tags_list, ensure_ascii=False)}
