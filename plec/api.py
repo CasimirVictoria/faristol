@@ -33,7 +33,9 @@ from plec.utils import (
     extraure_pagines_nota,
     extraure_identificador_fitxer,
     extraure_tags_nota,
-    check_and_import_from_downloads
+    check_and_import_from_downloads,
+    obtenir_pdfs_associats_nota,
+    obtenir_notes_associades_pdf
 )
 from plec.bibtex import GestorBibtex
 
@@ -1093,8 +1095,22 @@ def _desar_colleccions(dades: dict):
 @router.get("/plec/collections")
 @router.get("/collections")
 async def get_plec_collections():
-    """Retorna l'arbre de col·leccions virtuals de Plec."""
-    return _carregar_colleccions()
+    """Retorna l'arbre de col·leccions virtuals de Plec (assegurant la sincronització de PDFs associats a notes)."""
+    dades = _carregar_colleccions()
+    modificat = False
+    for col in dades.get("collections", []):
+        if "notes" not in col:
+            col["notes"] = []
+        if "pdfs" not in col:
+            col["pdfs"] = []
+        for n in col["notes"]:
+            for p in obtenir_pdfs_associats_nota(n):
+                if p not in col["pdfs"]:
+                    col["pdfs"].append(p)
+                    modificat = True
+    if modificat:
+        _desar_colleccions(dades)
+    return dades
 
 @router.post("/plec/collections")
 @router.post("/collections")
@@ -1165,18 +1181,33 @@ async def delete_plec_collection(col_id: str):
 
 @router.post("/plec/collections/{col_id}/add-item")
 async def add_item_to_collection(col_id: str, req: ItemColleccioRequest):
-    """Afegeix una nota o PDF a una col·lecció."""
+    """Afegeix una nota o PDF a una col·lecció (i sincronitza automàticament els fitxers associats)."""
     dades = _carregar_colleccions()
     col = next((c for c in dades["collections"] if c.get("id") == col_id), None)
     if not col:
         raise HTTPException(status_code=404, detail="Col·lecció no trobada")
 
-    clau = "notes" if req.type == "note" else "pdfs"
-    if clau not in col:
-        col[clau] = []
-    if req.filename not in col[clau]:
-        col[clau].append(req.filename)
-        _desar_colleccions(dades)
+    if "notes" not in col:
+        col["notes"] = []
+    if "pdfs" not in col:
+        col["pdfs"] = []
+
+    if req.type == "note":
+        if req.filename not in col["notes"]:
+            col["notes"].append(req.filename)
+        # Sincronitzar PDF(s) associat(s) a la nota
+        for p in obtenir_pdfs_associats_nota(req.filename):
+            if p not in col["pdfs"]:
+                col["pdfs"].append(p)
+    else:
+        if req.filename not in col["pdfs"]:
+            col["pdfs"].append(req.filename)
+        # Sincronitzar nota associada al PDF si existeix
+        for n in obtenir_notes_associades_pdf(req.filename):
+            if n not in col["notes"]:
+                col["notes"].append(n)
+
+    _desar_colleccions(dades)
     return {"status": "ok", "collection": col}
 
 @router.post("/plec/collections/{col_id}/remove-item")
@@ -1187,32 +1218,88 @@ async def remove_item_from_collection(col_id: str, req: ItemColleccioRequest):
     if not col:
         raise HTTPException(status_code=404, detail="Col·lecció no trobada")
 
-    clau = "notes" if req.type == "note" else "pdfs"
-    if clau in col and req.filename in col[clau]:
-        col[clau].remove(req.filename)
-        _desar_colleccions(dades)
+    if "notes" not in col:
+        col["notes"] = []
+    if "pdfs" not in col:
+        col["pdfs"] = []
+
+    if req.type == "note":
+        if req.filename in col["notes"]:
+            col["notes"].remove(req.filename)
+            # Eliminar PDFs associats només si cap altra nota de la carpeta els necessita
+            associated_pdfs = obtenir_pdfs_associats_nota(req.filename)
+            other_pdfs = set()
+            for other_n in col.get("notes", []):
+                for p in obtenir_pdfs_associats_nota(other_n):
+                    other_pdfs.add(p)
+            for p in associated_pdfs:
+                if p not in other_pdfs and p in col["pdfs"]:
+                    col["pdfs"].remove(p)
+    else:
+        if req.filename in col["pdfs"]:
+            col["pdfs"].remove(req.filename)
+
+    _desar_colleccions(dades)
     return {"status": "ok", "collection": col}
 
 @router.post("/plec/collections/set-item-collections")
 async def set_item_collections(req: SetItemCollectionsRequest):
     """Assigna una nota o PDF exactament a les col·leccions indicades."""
     dades = _carregar_colleccions()
-    clau = "notes" if req.type == "note" else "pdfs"
     target_ids = set(req.collection_ids)
 
-    for col in dades["collections"]:
-        cid = col.get("id")
-        if clau not in col:
-            col[clau] = []
-        if cid in target_ids:
-            if req.filename not in col[clau]:
-                col[clau].append(req.filename)
-        else:
-            if req.filename in col[clau]:
-                col[clau].remove(req.filename)
+    if req.type == "note":
+        associated_pdfs = obtenir_pdfs_associats_nota(req.filename)
+        for col in dades["collections"]:
+            cid = col.get("id")
+            if "notes" not in col:
+                col["notes"] = []
+            if "pdfs" not in col:
+                col["pdfs"] = []
+
+            if cid in target_ids:
+                if req.filename not in col["notes"]:
+                    col["notes"].append(req.filename)
+                for p in associated_pdfs:
+                    if p not in col["pdfs"]:
+                        col["pdfs"].append(p)
+            else:
+                if req.filename in col["notes"]:
+                    col["notes"].remove(req.filename)
+                    # Treure PDFs associats si cap altra nota de la carpeta els requereix
+                    other_pdfs = set()
+                    for other_n in col.get("notes", []):
+                        for p in obtenir_pdfs_associats_nota(other_n):
+                            other_pdfs.add(p)
+                    for p in associated_pdfs:
+                        if p not in other_pdfs and p in col["pdfs"]:
+                            col["pdfs"].remove(p)
+    else:
+        associated_notes = obtenir_notes_associades_pdf(req.filename)
+        for col in dades["collections"]:
+            cid = col.get("id")
+            if "notes" not in col:
+                col["notes"] = []
+            if "pdfs" not in col:
+                col["pdfs"] = []
+
+            if cid in target_ids:
+                if req.filename not in col["pdfs"]:
+                    col["pdfs"].append(req.filename)
+                for n in associated_notes:
+                    if n not in col["notes"]:
+                        col["notes"].append(n)
+            else:
+                if req.filename in col["pdfs"]:
+                    col["pdfs"].remove(req.filename)
 
     _desar_colleccions(dades)
-    return {"status": "ok", "filename": req.filename, "collections": list(target_ids)}
+    return {
+        "status": "ok",
+        "filename": req.filename,
+        "collections": list(target_ids),
+        "collections_data": dades["collections"]
+    }
 
 @router.post("/plec/collections/{col_id}/sync-notebooklm")
 async def sync_collection_notebooklm(col_id: str):
@@ -1221,6 +1308,19 @@ async def sync_collection_notebooklm(col_id: str):
     col = next((c for c in dades.get("collections", []) if c.get("id") == col_id), None)
     if not col:
         raise HTTPException(status_code=404, detail="Col·lecció no trobada")
+
+    # Assegurar que qualsevol PDF associat a les notes de la col·lecció està inclòs a col["pdfs"]
+    if "pdfs" not in col:
+        col["pdfs"] = []
+    modificat = False
+    for n in col.get("notes", []):
+        for p in obtenir_pdfs_associats_nota(n):
+            if p not in col["pdfs"]:
+                col["pdfs"].append(p)
+                modificat = True
+    if modificat:
+        _desar_colleccions(dades)
+
 
     col_name = col.get("name", "").strip()
     pdf_list = col.get("pdfs", [])

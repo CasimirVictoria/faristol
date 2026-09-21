@@ -256,3 +256,44 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str
             continue
 
     return False
+
+def obtenir_pdfs_associats_nota(nota_filename: str) -> List[str]:
+    """Retorna la llista de noms de fitxers PDF existents associats a una nota Markdown."""
+    from .config import FONTS_DIR, NOTAS_DIR
+    
+    n_path = NOTAS_DIR / nota_filename
+    res = []
+    rutes_vistes = set()
+    
+    # 1. Comprovació canònica directa (@citekey.md -> citekey.pdf)
+    stem = Path(nota_filename).stem
+    if stem.startswith("@"):
+        stem = stem[1:]
+    cand_pdf = FONTS_DIR / f"{stem}.pdf"
+    if cand_pdf.is_file():
+        res.append(cand_pdf.name)
+        rutes_vistes.add(cand_pdf.name)
+        
+    # 2. Anàlisi del contingut de la nota si existeix
+    if n_path.is_file():
+        try:
+            content = n_path.read_text(encoding="utf-8", errors="ignore")
+            trobats = detectar_tots_els_pdfs(n_path, content)
+            for _, p, _ in trobats:
+                if p.is_file() and p.name not in rutes_vistes:
+                    res.append(p.name)
+                    rutes_vistes.add(p.name)
+        except Exception:
+            pass
+            
+    return res
+
+def obtenir_notes_associades_pdf(pdf_filename: str) -> List[str]:
+    """Retorna la llista de noms de notes Markdown existents associades a un PDF."""
+    from .config import NOTAS_DIR
+    stem = Path(pdf_filename).stem
+    res = []
+    for cand in [f"@{stem}.md", f"{stem}.md"]:
+        if (NOTAS_DIR / cand).is_file():
+            res.append(cand)
+    return res

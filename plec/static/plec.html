@@ -5304,11 +5304,11 @@ async function afegirItemAColleccio(colId, type, filename) {
             body: JSON.stringify({ type: type, filename: filename })
         });
         if (res.ok) {
+            const data = await res.json();
             const col = state.collections.find(c => c.id === colId);
-            if (col) {
-                const clau = type === 'note' ? 'notes' : 'pdfs';
-                if (!col[clau]) col[clau] = [];
-                if (!col[clau].includes(filename)) col[clau].push(filename);
+            if (col && data.collection) {
+                col.notes = data.collection.notes || [];
+                col.pdfs = data.collection.pdfs || [];
             }
             renderitzarColleccions();
             renderitzarLlistaNotes();
@@ -5327,10 +5327,11 @@ async function treureItemDeColleccio(colId, type, filename) {
             body: JSON.stringify({ type: type, filename: filename })
         });
         if (res.ok) {
+            const data = await res.json();
             const col = state.collections.find(c => c.id === colId);
-            if (col) {
-                const clau = type === 'note' ? 'notes' : 'pdfs';
-                col[clau] = (col[clau] || []).filter(fn => fn !== filename);
+            if (col && data.collection) {
+                col.notes = data.collection.notes || [];
+                col.pdfs = data.collection.pdfs || [];
             }
             renderitzarColleccions();
             renderitzarLlistaNotes();
@@ -5492,16 +5493,16 @@ async function desarAssignacioColleccions() {
             })
         });
         if (res.ok) {
-            const clau = state.assigningItem.type === 'note' ? 'notes' : 'pdfs';
-            const fn = state.assigningItem.filename;
-            state.collections.forEach(col => {
-                if (!col[clau]) col[clau] = [];
-                if (selectedIds.includes(col.id)) {
-                    if (!col[clau].includes(fn)) col[clau].push(fn);
-                } else {
-                    col[clau] = col[clau].filter(x => x !== fn);
+            const data = await res.json();
+            if (data.collections_data) {
+                state.collections = data.collections_data;
+            } else {
+                const colsRes = await fetch('/api/plec/collections');
+                if (colsRes.ok) {
+                    const colsData = await colsRes.json();
+                    state.collections = colsData.collections || [];
                 }
-            });
+            }
             tancarModals();
             renderitzarColleccions();
             renderitzarLlistaNotes();
