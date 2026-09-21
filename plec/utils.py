@@ -189,15 +189,13 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str
     now = time.time()
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Paraules clau significatives del títol evitant termes genèrics biomèdics
-    stopwords = {
-        "with", "from", "that", "this", "study", "review", "their", "into", "journal",
-        "clinical", "health", "disease", "prevention", "human", "effect", "effects",
-        "role", "analysis", "system", "potential", "based", "using", "about", "between",
-        "approach", "perspective", "comprehensive"
-    }
-    title_words = [w.lower() for w in re.findall(r"[a-zA-Z]{4,}", title or "") if w.lower() not in stopwords]
+    def _strip_accents(text: str) -> str:
+        return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+
     doi_clean = re.sub(r"[^a-zA-Z0-9]", "", doi.split("/")[-1] if "/" in doi else doi).lower()
+    clean_full_title = re.sub(r"[^a-z0-9]", "", _strip_accents(title).lower()) if title else ""
+    main_title = re.split(r"[:\-\?]", title)[0].strip() if title else ""
+    clean_main_title = re.sub(r"[^a-z0-9]", "", _strip_accents(main_title).lower()) if main_title else ""
 
     for p in downloads_dir.glob("*.pdf"):
         try:
@@ -205,20 +203,25 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str
             if now - mtime > 28800:  # 8 hores
                 continue
 
-            fname_clean = re.sub(r"[^a-zA-Z0-9]", "", p.name).lower()
+            fname_clean = re.sub(r"[^a-zA-Z0-9]", "", _strip_accents(p.name).lower())
 
             # 1. Coincidència de nom amb DOI o PMID
-            if (pmid and str(pmid) in p.name) or (doi_clean and len(doi_clean) > 4 and doi_clean in fname_clean):
+            if (pmid and str(pmid) in fname_clean) or (doi_clean and len(doi_clean) > 4 and doi_clean in fname_clean):
                 shutil.copy2(p, target_path)
                 return True
 
-            # 2. Coincidència de text al contingut (primera pàgina)
-            if len(title_words) >= 2:
+            # 2. Coincidència de nom de fitxer amb el títol (ex: Dialnet-CreativityAndArtificialIntelligence...)
+            if len(clean_main_title) >= 12 and clean_main_title[:20] in fname_clean:
+                shutil.copy2(p, target_path)
+                return True
+
+            # 3. Coincidència estricta de frase al contingut de la primera pàgina
+            if len(clean_main_title) >= 12:
                 res = subprocess.run(["pdftotext", "-l", "1", str(p), "-"], capture_output=True, text=True, timeout=2)
                 if res.returncode == 0:
-                    text_lower = res.stdout.lower()
-                    matches = sum(1 for w in title_words if w in text_lower)
-                    if matches >= 3 and (matches / len(title_words) >= 0.5):
+                    clean_pdf = re.sub(r"[^a-z0-9]", "", _strip_accents(res.stdout).lower())
+                    if (clean_full_title and len(clean_full_title) >= 15 and clean_full_title in clean_pdf) or \
+                       (clean_main_title in clean_pdf):
                         shutil.copy2(p, target_path)
                         return True
         except Exception:
