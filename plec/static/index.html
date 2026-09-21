@@ -3714,7 +3714,7 @@ function saltarAPaginaPdf(pageNum, textDeCerca = null) {
 
         // 2. Si tenim fragment de text, fer cerca i ressaltat exacte amb el motor de cerca de PDF.js
         if (textDeCerca) {
-            const net = textDeCerca.replace(/^["'«»“„>\s]+|["'«»”\s]+$/g, '').trim();
+            const net = textDeCerca.replace(/^[*_~`"'«»“„>\s:;]+|[*_~`"'«»”\s:;]+$/g, '').trim();
             const paraulesTotals = net.split(/\s+/).filter(Boolean);
             
             if (paraulesTotals.length > 0 && cw.PDFViewerApplication.eventBus) {
@@ -4174,13 +4174,22 @@ function configurarEvents() {
             }
         }
 
-        // 3. Clic o hover sobre llista (li) amb (p. X)
+        // 3. Clic o hover sobre llista (li) amb (p. X) o idea clau
         const li = e.target.closest('li');
         if (li) {
             const liTxt = li.textContent || '';
-            const mLi = liTxt.match(/\(p\.\s*(\d+)\)[:\s]*(.*)/i);
+            const mLi = liTxt.match(/(?:📑\s*Pàgina|:NOTER_PAGE:|\(p\.\s*)(\d+)\)?/i);
             if (mLi) {
-                return { tipus: 'pagina', valor: mLi[1].trim(), cerca: mLi[2].replace(/^["'>\s]+|["'\s]+$/g, '').trim(), raw: mLi[0] };
+                const pnum = mLi[1].trim();
+                let cercaTxt = '';
+                const mQuotes = liTxt.match(/["«“]([^"»”\n]{3,})["»”]/);
+                if (mQuotes) {
+                    cercaTxt = mQuotes[1].trim();
+                } else {
+                    cercaTxt = liTxt.replace(/(?:📑\s*Pàgina|:NOTER_PAGE:|\(p\.\s*)\d+\)?/gi, '');
+                    cercaTxt = cercaTxt.replace(/[*_~`#]+/g, '').replace(/^[\s:;\->"]+|[\s:;\->"]+$/g, '').trim();
+                }
+                return { tipus: 'pagina', valor: pnum, cerca: cercaTxt, raw: mLi[0] };
             }
         }
 
@@ -4273,7 +4282,13 @@ function configurarEvents() {
                     const parentBlock = textNode.parentElement ? textNode.parentElement.closest('blockquote, li, p') : null;
                     let cercaTxt = '';
                     if (parentBlock) {
-                        cercaTxt = parentBlock.textContent.replace(/(?:📑\s*Pàgina|:NOTER_PAGE:|\(p\.\s*)\d+\)?/gi, '').replace(/^["'>\s]+|["'\s]+$/g, '').trim();
+                        const mQ = parentBlock.textContent.match(/["«“]([^"»”\n]{3,})["»”]/);
+                        if (mQ) {
+                            cercaTxt = mQ[1].trim();
+                        } else {
+                            cercaTxt = parentBlock.textContent.replace(/(?:📑\s*Pàgina|:NOTER_PAGE:|\(p\.\s*)\d+\)?/gi, '');
+                            cercaTxt = cercaTxt.replace(/[*_~`#]+/g, '').replace(/^[\s:;\->"]+|[\s:;\->"]+$/g, '').trim();
+                        }
                     }
                     return { tipus: 'pagina', valor: m[1].trim(), cerca: cercaTxt, raw: m[0] };
                 }
