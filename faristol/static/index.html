@@ -6098,7 +6098,10 @@ async function comprovarEstatAntigravity(force = false) {
         if (el.antigravityFrame) {
             const currentSrc = el.antigravityFrame.getAttribute('src');
             if (force || !currentSrc || currentSrc === 'about:blank') {
+                el.antigravityFrame.onload = () => notificarTemaAntigravity();
                 el.antigravityFrame.src = 'http://localhost:8000';
+            } else {
+                notificarTemaAntigravity();
             }
         }
         antigravityInitialCheckDone = true;
@@ -6118,6 +6121,18 @@ function carregarPanellAntigravity() {
 
 function recarregarAntigravityFrame() {
     comprovarEstatAntigravity(true);
+}
+
+function notificarTemaAntigravity(tema) {
+    const isDark = tema ? (tema === 'dark') : (document.documentElement.classList.contains('dark-theme') || document.body.classList.contains('dark-theme'));
+    const iframe = document.getElementById('antigravity-frame');
+    if (iframe && iframe.contentWindow) {
+        try {
+            iframe.contentWindow.postMessage({ type: 'set-theme', theme: isDark ? 'dark' : 'light' }, '*');
+        } catch (e) {
+            console.warn("No s'ha pogut notificar el tema a Antigravity:", e);
+        }
+    }
 }
 
 // --- Gestió del Tema (Clar per defecte / Fosc) ---
@@ -6167,6 +6182,9 @@ function aplicarTema(tema) {
             console.warn('Avís en canviar tema de Vditor:', err);
         }
     }
+
+    // Sincronitzar amb el subagent Antigravity si està incrustat en l'iframe
+    notificarTemaAntigravity(isDark ? 'dark' : 'light');
 }
 
 function tancarModals() {
