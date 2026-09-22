@@ -16,12 +16,24 @@
     <link rel="stylesheet" href="/static/libs/vditor/dist/js/katex/katex.min.css" />
     <script src="/static/libs/vditor/dist/js/katex/katex.min.js"></script>
 
+    <script>
+        (function() {
+            // Tema per defecte: clar. Carregar fosc únicament si l'usuari ho ha triat explícitament.
+            const savedTheme = localStorage.getItem('faristol_theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark-theme');
+            }
+        })();
+    </script>
+
     <style>
         :root {
             --bg-body: #f8fafc;
             --bg-surface: #ffffff;
             --bg-sidebar: #f1f5f9;
             --bg-hover: #e2e8f0;
+            --bg-subtle: #f1f5f9;
+            --bg-main: #ffffff;
             --border-color: #cbd5e1;
             --border-subtle: #e2e8f0;
             --text-main: #0f172a;
@@ -38,6 +50,27 @@
             --radius-lg: 8px;
             --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+        }
+
+        html.dark-theme,
+        body.dark-theme {
+            --bg-body: #090d16;
+            --bg-surface: #131c2e;
+            --bg-sidebar: #0e1626;
+            --bg-hover: #1e293b;
+            --bg-subtle: #172338;
+            --bg-main: #131c2e;
+            --border-color: #24324a;
+            --border-subtle: #1b273d;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-subtle: #64748b;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --accent-light: rgba(59, 130, 246, 0.18);
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
         }
 
         * {
@@ -97,6 +130,17 @@
             background: var(--accent-hover);
         }
 
+        .btn-outline {
+            background: transparent;
+            color: var(--text-main);
+            border-color: var(--border-color);
+        }
+
+        .btn-outline:hover {
+            background: var(--bg-hover);
+            color: var(--text-main);
+        }
+
         .btn-sm {
             padding: 3px 7px;
             font-size: 11px;
@@ -154,7 +198,7 @@
             height: 38px;
             box-sizing: border-box;
             border-bottom: 1px solid var(--border-color);
-            background: #e2e8f0;
+            background: var(--bg-hover);
             padding: 4px 6px 0 6px;
             gap: 4px;
         }
@@ -239,7 +283,7 @@
             padding: 6px 10px;
             overflow-x: auto;
             border-bottom: 1px solid var(--border-subtle);
-            background: #f8fafc;
+            background: var(--bg-body);
             scrollbar-width: none;
         }
         .tag-filter-bar::-webkit-scrollbar { display: none; }
@@ -248,7 +292,7 @@
             padding: 2px 7px;
             font-size: 11px;
             border-radius: 12px;
-            background: #e2e8f0;
+            background: var(--bg-hover);
             color: var(--text-muted);
             cursor: pointer;
             white-space: nowrap;
@@ -256,7 +300,8 @@
         }
 
         .tag-chip:hover {
-            background: #cbd5e1;
+            background: var(--border-color);
+            color: var(--text-main);
         }
 
         .tag-chip.active {
@@ -502,7 +547,7 @@
         .editor-toolbar {
             height: 38px;
             border-bottom: 1px solid var(--border-color);
-            background: #fafafa;
+            background: var(--bg-surface);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -582,12 +627,12 @@
             width: 100% !important;
             height: 100% !important;
             border: none !important;
-            background: #ffffff;
+            background: var(--bg-surface);
         }
 
         .vditor-toolbar {
             border-bottom: 1px solid var(--border-color) !important;
-            background-color: #f8fafc !important;
+            background-color: var(--bg-surface) !important;
             padding: 4px 8px !important;
         }
 
@@ -601,10 +646,11 @@
         .vditor-hint {
             border-radius: 8px !important;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
-            border: 1px solid #cbd5e1 !important;
+            border: 1px solid var(--border-color) !important;
             max-height: 280px !important;
             padding: 4px !important;
-            background: #ffffff !important;
+            background: var(--bg-surface) !important;
+            color: var(--text-main) !important;
         }
 
         .vditor-link-pill {
@@ -841,7 +887,7 @@
         /* Bottom Connections & Backlinks Drawer */
         .connections-drawer {
             border-top: 1px solid var(--border-color);
-            background: #f8fafc;
+            background: var(--bg-sidebar);
             max-height: 160px;
             display: flex;
             flex-direction: column;
@@ -858,7 +904,7 @@
             justify-content: space-between;
             cursor: pointer;
             user-select: none;
-            background: #f1f5f9;
+            background: var(--bg-surface);
         }
 
         .connections-body {
@@ -993,7 +1039,7 @@
         .modal-footer {
             padding: 10px 16px;
             border-top: 1px solid var(--border-color);
-            background: #f8fafc;
+            background: var(--bg-sidebar);
             display: flex;
             justify-content: flex-end;
             gap: 8px;
@@ -1011,15 +1057,17 @@
             color: var(--text-muted);
         }
 
-        .form-control {
+        .form-control, .form-select {
             padding: 8px 10px;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             font-size: 13px;
+            background: var(--bg-surface);
+            color: var(--text-main);
             outline: none;
         }
 
-        .form-control:focus {
+        .form-control:focus, .form-select:focus {
             border-color: var(--accent);
         }
 
@@ -1490,7 +1538,7 @@
                 </div>
 
                 <!-- Contenidor de l'Iframe (mantingut viu al DOM per preservar la conversa) -->
-                <div id="antigravity-frame-container" style="flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; background: #ffffff;">
+                <div id="antigravity-frame-container" style="flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; background: var(--bg-surface);">
                     <iframe id="antigravity-frame" src="about:blank" style="width: 100%; height: 100%; border: none; display: block;" allow="clipboard-read; clipboard-write"></iframe>
                 </div>
             </div>
@@ -1499,6 +1547,9 @@
             <div class="library-footer">
                 <span id="library-status">Carregant biblioteca...</span>
                 <div style="display: flex; gap: 4px; align-items: center;">
+                    <button class="btn btn-sm" id="btn-theme-toggle-lib" title="Canviar tema clar/fosc (Alt+T)" style="padding: 2px 6px; font-size: 11px;">
+                        <i class="fa-solid fa-moon" id="theme-toggle-icon-lib"></i>
+                    </button>
                     <button class="btn btn-sm" id="btn-toggle-antigravity-tab" title="Mostrar/amagar pestanya de l'Agent Antigravity (Alt+A)" style="padding: 2px 6px; font-size: 11px; border: 1px solid transparent;">
                         <i class="fa-solid fa-robot" style="color: #8b5cf6;"></i>
                     </button>
@@ -1546,6 +1597,9 @@
                     </button>
                     <button class="btn btn-sm" id="btn-swap-panels-pdf" title="Intercanviar Editor i PDF (F7 / Alt+W)">
                         <i class="fa-solid fa-right-left"></i> <span class="swap-label">Editor al centre</span>
+                    </button>
+                    <button class="btn btn-sm btn-icon-only" id="btn-theme-toggle" title="Canviar tema clar/fosc (Alt+T)" style="padding: 3px 7px;">
+                        <i class="fa-solid fa-moon" id="theme-toggle-icon"></i>
                     </button>
                     <button class="btn btn-sm btn-icon-only" id="btn-shortcuts" title="Dreceres de teclat (F1 / ?)">
                         <i class="fa-solid fa-keyboard"></i>
@@ -1760,6 +1814,7 @@
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F7</b> / <b>Alt + W</b></td><td>Intercanviar posicions de l'Editor i del visor PDF</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F8</b> / <b>Alt + K</b></td><td>Obrir la nota actual amb Kate natiu</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>Alt + A</b></td><td>Obrir la pestanya de l'Agent Antigravity</td></tr>
+                <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>Alt + T</b></td><td>Alternar entre tema clar i tema fosc</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F9</b></td><td>Amagar / Mostrar la Biblioteca esquerra</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F10</b></td><td>Amagar / Mostrar el visor PDF central</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F11</b></td><td>Obrir el PDF actual amb Okular natiu</td></tr>
@@ -1998,6 +2053,7 @@ window.vditorInstance = null;
 window.vditorReady = false;
 
 function initVditor(initialValue = '') {
+    const isDark = document.documentElement.classList.contains('dark-theme') || document.body.classList.contains('dark-theme');
     window.vditorInstance = new Vditor('vditor-container', {
         cdn: '/static/libs/vditor',
         lang: 'en_US',
@@ -2005,7 +2061,7 @@ function initVditor(initialValue = '') {
         mode: 'ir', // Instant Rendering (Obsidian Live Preview)
         placeholder: 'Escriu la teua nota en format Markdown... (Previsualització en viu de fórmules LaTeX KaTeX $f(x)$)',
         height: '100%',
-        theme: 'classic',
+        theme: isDark ? 'dark' : 'classic',
         cache: { enable: false },
         toolbarConfig: { pin: true },
         hint: {
@@ -2067,14 +2123,14 @@ function initVditor(initialValue = '') {
             'edit-mode', 'outline', 'both', 'preview'
         ],
         preview: {
-            theme: { current: 'light' },
+            theme: { current: isDark ? 'dark' : 'light' },
             math: {
                 inlineDigit: true,
                 engine: 'KaTeX'
             },
             hljs: {
                 enable: true,
-                style: 'github'
+                style: isDark ? 'github-dark' : 'github'
             }
         },
         after() {
@@ -2105,6 +2161,7 @@ function debounceGuardarNota() {
 
 // --- Inicialització ---
 document.addEventListener('DOMContentLoaded', async () => {
+    inicialitzarTema();
     initVditor();
     configurarEvents();
     configurarSplitters();
@@ -4896,12 +4953,23 @@ function configurarEvents() {
             }
             canviarPestanya('antigravity');
         }
+        // Alt+T: Canviar tema clar/fosc
+        if (e.altKey && (e.key === 't' || e.key === 'T')) {
+            e.preventDefault();
+            alternarTema();
+        }
         // Escape: tancar modals
         if (e.key === 'Escape') {
             tancarModals();
         }
     });
     
+    // Commutadors de Tema (Clar / Fosc)
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    if (btnThemeToggle) btnThemeToggle.onclick = alternarTema;
+    const btnThemeToggleLib = document.getElementById('btn-theme-toggle-lib');
+    if (btnThemeToggleLib) btnThemeToggleLib.onclick = alternarTema;
+
     // Intercanvi de Panells (Editor al centre / PDF al centre)
     const btnSwapPdf = document.getElementById('btn-swap-panels-pdf');
     if (btnSwapPdf) btnSwapPdf.onclick = toggleSwapPanells;
@@ -6050,6 +6118,55 @@ function carregarPanellAntigravity() {
 
 function recarregarAntigravityFrame() {
     comprovarEstatAntigravity(true);
+}
+
+// --- Gestió del Tema (Clar per defecte / Fosc) ---
+function inicialitzarTema() {
+    const savedTheme = localStorage.getItem('faristol_theme');
+    // Per defecte clar ('light'), llevat que l'usuari haja guardat 'dark'
+    const isDark = (savedTheme === 'dark');
+    aplicarTema(isDark ? 'dark' : 'light');
+}
+
+function alternarTema() {
+    const isCurrentlyDark = document.documentElement.classList.contains('dark-theme') || document.body.classList.contains('dark-theme');
+    aplicarTema(isCurrentlyDark ? 'light' : 'dark');
+}
+
+function aplicarTema(tema) {
+    const isDark = (tema === 'dark');
+    document.documentElement.classList.toggle('dark-theme', isDark);
+    document.body.classList.toggle('dark-theme', isDark);
+    localStorage.setItem('faristol_theme', isDark ? 'dark' : 'light');
+
+    // Actualitzar icones i títols
+    const iconHeader = document.getElementById('theme-toggle-icon');
+    if (iconHeader) {
+        iconHeader.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        if (iconHeader.parentElement) {
+            iconHeader.parentElement.title = isDark ? 'Canviar a tema clar (Alt+T)' : 'Canviar a tema fosc (Alt+T)';
+        }
+    }
+    const iconLib = document.getElementById('theme-toggle-icon-lib');
+    if (iconLib) {
+        iconLib.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        if (iconLib.parentElement) {
+            iconLib.parentElement.title = isDark ? 'Canviar a tema clar (Alt+T)' : 'Canviar a tema fosc (Alt+T)';
+        }
+    }
+
+    // Sincronitzar amb Vditor si està llest
+    if (window.vditorInstance && window.vditorReady) {
+        try {
+            if (isDark) {
+                window.vditorInstance.setTheme('dark', 'dark', 'github-dark');
+            } else {
+                window.vditorInstance.setTheme('classic', 'light', 'github');
+            }
+        } catch (err) {
+            console.warn('Avís en canviar tema de Vditor:', err);
+        }
+    }
 }
 
 function tancarModals() {
