@@ -361,6 +361,45 @@
             max-width: none !important;
         }
 
+        /* Mode Intercanviat: Editor al centre, Visor PDF a la dreta */
+        .workspace.layout-editor-center .panel-library {
+            order: 1;
+        }
+
+        .workspace.layout-editor-center #splitter-left {
+            order: 2;
+        }
+
+        .workspace.layout-editor-center .panel-editor {
+            order: 3;
+            flex: 1 !important;
+            width: auto !important;
+            max-width: none !important;
+            border-right: none;
+        }
+
+        .workspace.layout-editor-center #splitter-right {
+            order: 4;
+        }
+
+        .workspace.layout-editor-center .panel-center {
+            order: 5;
+            flex: none !important;
+            width: 480px;
+            min-width: 280px;
+            max-width: 850px;
+            border-right: none;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .workspace.layout-editor-center .panel-center.collapsed {
+            display: none !important;
+        }
+
+        .workspace.layout-editor-center .panel-center.collapsed + #splitter-right {
+            display: none !important;
+        }
+
         .pdf-toolbar {
             height: 38px;
             background: var(--bg-surface);
@@ -1446,6 +1485,9 @@
                     <button class="btn btn-sm" id="btn-open-okular" title="Obrir amb Okular (F11)">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Okular (F11)
                     </button>
+                    <button class="btn btn-sm" id="btn-swap-panels-pdf" title="Intercanviar Editor i PDF (F7 / Alt+W)">
+                        <i class="fa-solid fa-right-left"></i> <span class="swap-label">Editor al centre</span>
+                    </button>
                     <button class="btn btn-sm btn-icon-only" id="btn-shortcuts" title="Dreceres de teclat (F1 / ?)">
                         <i class="fa-solid fa-keyboard"></i>
                     </button>
@@ -1496,6 +1538,9 @@
 
                 <!-- Botons d'acció i Estat de guardat -->
                 <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    <button class="btn btn-sm btn-outline" id="btn-swap-panels-editor" title="Intercanviar Editor i PDF (F7 / Alt+W)">
+                        <i class="fa-solid fa-right-left"></i> <span class="swap-label">Intercanviar (F7)</span>
+                    </button>
                     <button class="btn btn-sm btn-outline" id="btn-open-kate" title="Obrir la nota actual amb Kate (F8 o Alt+K)" style="gap: 5px;">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> <span>Kate</span>
                     </button>
@@ -1653,6 +1698,7 @@
         <div class="modal-body" style="font-size: 13px;">
             <table style="width: 100%; border-collapse: collapse;">
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>Ctrl + S</b></td><td>Guardar la nota actual a disc</td></tr>
+                <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F7</b> / <b>Alt + W</b></td><td>Intercanviar posicions de l'Editor i del visor PDF</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F8</b> / <b>Alt + K</b></td><td>Obrir la nota actual amb Kate natiu</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F9</b></td><td>Amagar / Mostrar la Biblioteca esquerra</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F10</b></td><td>Amagar / Mostrar el visor PDF central</td></tr>
@@ -1871,6 +1917,11 @@ const el = {
     // Modals & Drag
     dropOverlay: document.getElementById('drop-overlay'),
     fileUploadInput: document.getElementById('file-upload-input'),
+    
+    // Layout & Panells
+    workspace: document.getElementById('workspace'),
+    btnSwapPanelsPdf: document.getElementById('btn-swap-panels-pdf'),
+    btnSwapPanelsEditor: document.getElementById('btn-swap-panels-editor'),
 };
 
 // --- Inicialització de l'Editor Vditor (Live Preview amb KaTeX) ---
@@ -4750,6 +4801,11 @@ function configurarEvents() {
             e.preventDefault();
             obrirAmbOkular();
         }
+        // F7 o Alt+W: Intercanviar Editor i PDF
+        if (e.key === 'F7' || (e.altKey && (e.key === 'w' || e.key === 'W'))) {
+            e.preventDefault();
+            toggleSwapPanells();
+        }
         // F8 o Alt+K: Kate (Editor extern)
         if (e.key === 'F8' || (e.altKey && (e.key === 'k' || e.key === 'K'))) {
             e.preventDefault();
@@ -4760,6 +4816,12 @@ function configurarEvents() {
             tancarModals();
         }
     });
+    
+    // Intercanvi de Panells (Editor al centre / PDF al centre)
+    const btnSwapPdf = document.getElementById('btn-swap-panels-pdf');
+    if (btnSwapPdf) btnSwapPdf.onclick = toggleSwapPanells;
+    const btnSwapEd = document.getElementById('btn-swap-panels-editor');
+    if (btnSwapEd) btnSwapEd.onclick = toggleSwapPanells;
     
     // Modals
     document.getElementById('btn-new-note').onclick = () => {
@@ -4794,6 +4856,43 @@ function togglePanellPdf() {
     el.panelCenter.classList.toggle('collapsed');
 }
 
+function toggleSwapPanells() {
+    const isEditorCenter = el.workspace.classList.toggle('layout-editor-center');
+    try {
+        localStorage.setItem('faristol_layout_editor_center', isEditorCenter ? '1' : '0');
+        if (isEditorCenter) {
+            const savedPdfSide = localStorage.getItem('faristol_pdf_side_width') || '480';
+            el.panelCenter.style.width = savedPdfSide + 'px';
+            el.panelEditor.style.width = '';
+        } else {
+            const savedEditor = localStorage.getItem('plec_editor_width') || '440';
+            el.panelEditor.style.width = savedEditor + 'px';
+            el.panelCenter.style.width = '';
+        }
+    } catch (e) {}
+    actualitzarEstatSwap(isEditorCenter);
+    setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, 50);
+}
+
+function actualitzarEstatSwap(isEditorCenter) {
+    const labels = document.querySelectorAll('.swap-label');
+    labels.forEach(lbl => {
+        lbl.textContent = isEditorCenter ? 'PDF al centre' : 'Editor al centre';
+    });
+    const btnPdf = document.getElementById('btn-swap-panels-pdf');
+    const btnEd = document.getElementById('btn-swap-panels-editor');
+    if (btnPdf) {
+        btnPdf.title = isEditorCenter ? 'Tornar PDF al centre (F7 / Alt+W)' : 'Posar Editor al centre (F7 / Alt+W)';
+        btnPdf.classList.toggle('btn-primary', isEditorCenter);
+    }
+    if (btnEd) {
+        btnEd.title = isEditorCenter ? 'Tornar PDF al centre (F7 / Alt+W)' : 'Posar Editor al centre (F7 / Alt+W)';
+        btnEd.classList.toggle('btn-primary', isEditorCenter);
+    }
+}
+
 async function obrirAmbOkular() {
     if (!state.activePdfFilename) {
         alert("Cap PDF seleccionat per a obrir amb Okular.");
@@ -4819,15 +4918,31 @@ function configurarSplitters() {
     try {
         const savedLib = localStorage.getItem('plec_lib_width');
         const savedEditor = localStorage.getItem('plec_editor_width');
+        const savedPdfSide = localStorage.getItem('faristol_pdf_side_width');
+        const isEditorCenter = localStorage.getItem('faristol_layout_editor_center') === '1';
+
+        if (isEditorCenter) {
+            el.workspace.classList.add('layout-editor-center');
+            actualitzarEstatSwap(true);
+            if (savedPdfSide && parseInt(savedPdfSide, 10) >= 280) {
+                el.panelCenter.style.width = savedPdfSide + 'px';
+            } else {
+                el.panelCenter.style.width = '480px';
+            }
+            el.panelEditor.style.width = '';
+        } else {
+            if (savedEditor && parseInt(savedEditor, 10) >= 280) {
+                el.panelEditor.style.width = savedEditor + 'px';
+            } else {
+                el.panelEditor.style.width = '440px';
+            }
+            el.panelCenter.style.width = '';
+        }
+
         if (savedLib && parseInt(savedLib, 10) >= 360) {
             el.panelLibrary.style.width = savedLib + 'px';
         } else {
             el.panelLibrary.style.width = '440px';
-        }
-        if (savedEditor && parseInt(savedEditor, 10) >= 280) {
-            el.panelEditor.style.width = savedEditor + 'px';
-        } else {
-            el.panelEditor.style.width = '440px';
         }
     } catch (e) {}
     
@@ -4859,8 +4974,15 @@ function configurarSplitters() {
                 if (!el.panelLibrary.classList.contains('collapsed')) {
                     localStorage.setItem('plec_lib_width', el.panelLibrary.offsetWidth);
                 }
-                if (!el.panelCenter.classList.contains('collapsed')) {
-                    localStorage.setItem('plec_editor_width', el.panelEditor.offsetWidth);
+                const isEditorCenter = el.workspace.classList.contains('layout-editor-center');
+                if (isEditorCenter) {
+                    if (!el.panelCenter.classList.contains('collapsed')) {
+                        localStorage.setItem('faristol_pdf_side_width', el.panelCenter.offsetWidth);
+                    }
+                } else {
+                    if (!el.panelEditor.classList.contains('collapsed')) {
+                        localStorage.setItem('plec_editor_width', el.panelEditor.offsetWidth);
+                    }
                 }
             } catch (e) {}
         }
@@ -4868,15 +4990,21 @@ function configurarSplitters() {
     
     window.addEventListener('mousemove', (e) => {
         if (isDraggingLeft) {
-            const workspaceRect = document.getElementById('workspace').getBoundingClientRect();
+            const workspaceRect = el.workspace.getBoundingClientRect();
             const newWidth = Math.max(200, Math.min(650, e.clientX - workspaceRect.left));
             el.panelLibrary.style.width = newWidth + 'px';
         }
         if (isDraggingRight) {
-            const workspaceRect = document.getElementById('workspace').getBoundingClientRect();
+            const workspaceRect = el.workspace.getBoundingClientRect();
             const offsetRight = workspaceRect.right - e.clientX;
-            const newEditorWidth = Math.max(280, Math.min(workspaceRect.width - 350, offsetRight));
-            el.panelEditor.style.width = newEditorWidth + 'px';
+            const isEditorCenter = el.workspace.classList.contains('layout-editor-center');
+            if (isEditorCenter) {
+                const newPdfWidth = Math.max(280, Math.min(workspaceRect.width - 350, offsetRight));
+                el.panelCenter.style.width = newPdfWidth + 'px';
+            } else {
+                const newEditorWidth = Math.max(280, Math.min(workspaceRect.width - 350, offsetRight));
+                el.panelEditor.style.width = newEditorWidth + 'px';
+            }
         }
     });
 }
