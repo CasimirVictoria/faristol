@@ -161,8 +161,9 @@
 
         .tab-btn {
             flex: 1;
-            padding: 6px 8px;
-            font-size: 12px;
+            min-width: 0;
+            padding: 6px 4px;
+            font-size: 11px;
             font-weight: 600;
             text-align: center;
             border: 1px solid transparent;
@@ -176,8 +177,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
+            gap: 4px;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tab-btn span {
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .tab-btn.active {
@@ -1243,6 +1251,9 @@
                     <button class="tab-btn" id="tab-search-btn" title="Cerca acadèmica federada (18 fonts)">
                         <i class="fa-solid fa-globe" style="color: #10b981;"></i> <span>Cerca</span>
                     </button>
+                    <button class="tab-btn" id="tab-antigravity-btn" title="Assistent Antigravity (localhost:8000)" style="display: none;">
+                        <i class="fa-solid fa-robot" style="color: #8b5cf6;"></i> <span>Agent</span>
+                    </button>
                 </div>
                 <button class="btn btn-sm btn-icon-only" id="btn-collapse-sidebar" title="Ocultar biblioteca (F9)" style="padding: 2px 6px; font-size: 11px; margin-bottom: 2px; border: none; background: transparent; color: var(--text-muted);">
                     <i class="fa-solid fa-chevron-left"></i>
@@ -1441,12 +1452,60 @@
                 </div>
             </div>
 
+            <!-- Panell 6: Assistent Antigravity (Localhost 8000) -->
+            <div class="list-container" id="panel-antigravity-view" style="display: none; flex-direction: column; height: 100%; overflow: hidden; padding: 0;">
+                <!-- Barra d'eines / estat Antigravity -->
+                <div style="padding: 6px 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; font-size: 11px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-robot" style="color: #8b5cf6; font-size: 12px;"></i>
+                        <strong style="color: var(--text-main);">Antigravity</strong>
+                        <span id="antigravity-status-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 600; background: rgba(139, 92, 246, 0.12); color: #8b5cf6;">
+                            <i class="fa-solid fa-circle" style="font-size: 5px;"></i> <span>Verificant...</span>
+                        </span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <button class="btn btn-sm btn-icon-only" id="btn-reload-antigravity" title="Recarregar xat d'Antigravity" style="padding: 2px 5px; font-size: 10px;">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                        <a href="http://localhost:8000" target="_blank" class="btn btn-sm btn-icon-only" title="Obrir en una pestanya nova de Firefox" style="padding: 2px 5px; font-size: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Estat Offline / Error (si localhost:8000 no està actiu) -->
+                <div id="antigravity-offline-alert" style="display: none; padding: 24px 16px; text-align: center; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--bg-surface);">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                        <i class="fa-solid fa-plug-circle-xmark"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Servidor no detectat a localhost:8000</div>
+                        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; max-width: 280px; margin: 0 auto;">
+                            Assegura't que l'agent Antigravity CLI o el servidor web s'està executant a <code>http://localhost:8000</code>.
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" id="btn-retry-antigravity" style="padding: 4px 12px; font-size: 11px; gap: 6px;">
+                        <i class="fa-solid fa-rotate"></i> Tornar a provar
+                    </button>
+                </div>
+
+                <!-- Contenidor de l'Iframe (mantingut viu al DOM per preservar la conversa) -->
+                <div id="antigravity-frame-container" style="flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; background: #ffffff;">
+                    <iframe id="antigravity-frame" src="about:blank" style="width: 100%; height: 100%; border: none; display: block;" allow="clipboard-read; clipboard-write"></iframe>
+                </div>
+            </div>
+
             <!-- Peu Biblioteca -->
             <div class="library-footer">
                 <span id="library-status">Carregant biblioteca...</span>
-                <button class="btn btn-sm" id="btn-refresh-lib" title="Recarregar">
-                    <i class="fa-solid fa-rotate"></i>
-                </button>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                    <button class="btn btn-sm" id="btn-toggle-antigravity-tab" title="Mostrar/amagar pestanya de l'Agent Antigravity (Alt+A)" style="padding: 2px 6px; font-size: 11px; border: 1px solid transparent;">
+                        <i class="fa-solid fa-robot" style="color: #8b5cf6;"></i>
+                    </button>
+                    <button class="btn btn-sm" id="btn-refresh-lib" title="Recarregar">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
             </div>
         </aside>
 
@@ -1700,6 +1759,7 @@
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>Ctrl + S</b></td><td>Guardar la nota actual a disc</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F7</b> / <b>Alt + W</b></td><td>Intercanviar posicions de l'Editor i del visor PDF</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F8</b> / <b>Alt + K</b></td><td>Obrir la nota actual amb Kate natiu</td></tr>
+                <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>Alt + A</b></td><td>Obrir la pestanya de l'Agent Antigravity</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F9</b></td><td>Amagar / Mostrar la Biblioteca esquerra</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F10</b></td><td>Amagar / Mostrar el visor PDF central</td></tr>
                 <tr style="border-bottom: 1px solid var(--border-subtle);"><td style="padding: 6px 0;"><b>F11</b></td><td>Obrir el PDF actual amb Okular natiu</td></tr>
@@ -1851,6 +1911,15 @@ const el = {
     panelNotebooklmView: document.getElementById('panel-notebooklm-view'),
     tabSearchBtn: document.getElementById('tab-search-btn'),
     panelSearchView: document.getElementById('panel-search-view'),
+    tabAntigravityBtn: document.getElementById('tab-antigravity-btn'),
+    panelAntigravityView: document.getElementById('panel-antigravity-view'),
+    antigravityFrame: document.getElementById('antigravity-frame'),
+    antigravityFrameContainer: document.getElementById('antigravity-frame-container'),
+    antigravityStatusBadge: document.getElementById('antigravity-status-badge'),
+    antigravityOfflineAlert: document.getElementById('antigravity-offline-alert'),
+    btnReloadAntigravity: document.getElementById('btn-reload-antigravity'),
+    btnRetryAntigravity: document.getElementById('btn-retry-antigravity'),
+    btnToggleAntigravityTab: document.getElementById('btn-toggle-antigravity-tab'),
     searchAcademicInput: document.getElementById('search-academic-input'),
     searchAcademicSources: document.getElementById('search-academic-sources'),
     searchAcademicVpn: document.getElementById('search-academic-vpn'),
@@ -2113,15 +2182,17 @@ function canviarPestanya(tabName) {
     el.tabPdfsBtn.classList.toggle('active', tabName === 'pdfs');
     if (el.tabNotebooklmBtn) el.tabNotebooklmBtn.classList.toggle('active', tabName === 'notebooklm');
     if (el.tabSearchBtn) el.tabSearchBtn.classList.toggle('active', tabName === 'search');
+    if (el.tabAntigravityBtn) el.tabAntigravityBtn.classList.toggle('active', tabName === 'antigravity');
     
     el.listCollections.style.display = tabName === 'collections' ? 'block' : 'none';
     el.listNotes.style.display = tabName === 'notes' ? 'block' : 'none';
     el.listPdfs.style.display = tabName === 'pdfs' ? 'block' : 'none';
     if (el.panelNotebooklmView) el.panelNotebooklmView.style.display = tabName === 'notebooklm' ? 'flex' : 'none';
     if (el.panelSearchView) el.panelSearchView.style.display = tabName === 'search' ? 'flex' : 'none';
+    if (el.panelAntigravityView) el.panelAntigravityView.style.display = tabName === 'antigravity' ? 'flex' : 'none';
 
     const searchBox = document.querySelector('.library-search-box');
-    if (searchBox) searchBox.style.display = (tabName === 'notebooklm' || tabName === 'search') ? 'none' : 'block';
+    if (searchBox) searchBox.style.display = (tabName === 'notebooklm' || tabName === 'search' || tabName === 'antigravity') ? 'none' : 'block';
     el.tagFilterBar.style.display = (tabName === 'notes') ? 'flex' : 'none';
     
     if (tabName === 'collections') {
@@ -2136,6 +2207,8 @@ function canviarPestanya(tabName) {
         if (el.searchAcademicInput) {
             setTimeout(() => el.searchAcademicInput.focus(), 50);
         }
+    } else if (tabName === 'antigravity') {
+        carregarPanellAntigravity();
     }
 }
 
@@ -4107,6 +4180,7 @@ function configurarEvents() {
     el.tabPdfsBtn.onclick = () => canviarPestanya('pdfs');
     if (el.tabNotebooklmBtn) el.tabNotebooklmBtn.onclick = () => canviarPestanya('notebooklm');
     if (el.tabSearchBtn) el.tabSearchBtn.onclick = () => canviarPestanya('search');
+    if (el.tabAntigravityBtn) el.tabAntigravityBtn.onclick = () => canviarPestanya('antigravity');
 
     // Cerca acadèmica federada events
     if (el.btnSearchAcademic) {
@@ -4811,6 +4885,17 @@ function configurarEvents() {
             e.preventDefault();
             obrirAmbKate();
         }
+        // Alt+A: Pestanya Agent Antigravity
+        if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+            e.preventDefault();
+            if (el.panelLibrary.classList.contains('collapsed')) {
+                el.panelLibrary.classList.remove('collapsed');
+            }
+            if (el.tabAntigravityBtn && el.tabAntigravityBtn.style.display === 'none') {
+                alternarPestanyaAntigravity(true);
+            }
+            canviarPestanya('antigravity');
+        }
         // Escape: tancar modals
         if (e.key === 'Escape') {
             tancarModals();
@@ -4850,6 +4935,18 @@ function configurarEvents() {
     };
     
     document.getElementById('btn-refresh-lib').onclick = carregarDadesBiblioteca;
+
+    // Controls Agent Antigravity
+    if (el.btnToggleAntigravityTab) {
+        el.btnToggleAntigravityTab.onclick = () => alternarPestanyaAntigravity(true);
+    }
+    if (el.btnReloadAntigravity) {
+        el.btnReloadAntigravity.onclick = () => recarregarAntigravityFrame();
+    }
+    if (el.btnRetryAntigravity) {
+        el.btnRetryAntigravity.onclick = () => comprovarEstatAntigravity(true);
+    }
+    alternarPestanyaAntigravity(false); // Inicialitza segons preferència de l'usuari (localStorage)
 }
 
 function togglePanellPdf() {
@@ -5885,6 +5982,75 @@ window.addEventListener('popstate', (e) => {
         obrirPdf(pdf, false);
     }
 });
+
+// --- Funcions Agent Antigravity ---
+let antigravityInitialCheckDone = false;
+
+function alternarPestanyaAntigravity(manualToggle = false) {
+    let show = localStorage.getItem('faristol_show_antigravity_tab');
+    if (show === null) {
+        show = '1'; // Per defecte visible ja que és una funcionalitat requerida
+    }
+    
+    if (manualToggle) {
+        show = (show === '1') ? '0' : '1';
+        localStorage.setItem('faristol_show_antigravity_tab', show);
+    }
+
+    const isVisible = (show === '1');
+    if (el.tabAntigravityBtn) {
+        el.tabAntigravityBtn.style.display = isVisible ? 'flex' : 'none';
+    }
+    if (el.btnToggleAntigravityTab) {
+        el.btnToggleAntigravityTab.style.color = isVisible ? '#8b5cf6' : 'var(--text-muted)';
+        el.btnToggleAntigravityTab.style.borderColor = isVisible ? 'rgba(139, 92, 246, 0.4)' : 'transparent';
+        el.btnToggleAntigravityTab.title = isVisible 
+            ? "Ocultar pestanya de l'Agent Antigravity (Alt+A)" 
+            : "Mostrar pestanya de l'Agent Antigravity (Alt+A)";
+    }
+
+    // Si s'amaga i l'usuari tenia activa la pestanya d'antigravity, tornar a notes
+    if (!isVisible && state.activeTab === 'antigravity') {
+        canviarPestanya('notes');
+    }
+}
+
+async function comprovarEstatAntigravity(force = false) {
+    if (!el.antigravityStatusBadge) return;
+    
+    el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #f59e0b;"></i> <span>Verificant...</span>';
+    
+    try {
+        await fetch('http://localhost:8000/', { mode: 'no-cors', cache: 'no-store' });
+        // Si no llança error de connexió, el servidor respon a localhost:8000
+        el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #10b981;"></i> <span style="color: #10b981;">En línia</span>';
+        if (el.antigravityOfflineAlert) el.antigravityOfflineAlert.style.display = 'none';
+        if (el.antigravityFrameContainer) el.antigravityFrameContainer.style.display = 'block';
+
+        if (el.antigravityFrame) {
+            const currentSrc = el.antigravityFrame.getAttribute('src');
+            if (force || !currentSrc || currentSrc === 'about:blank') {
+                el.antigravityFrame.src = 'http://localhost:8000';
+            }
+        }
+        antigravityInitialCheckDone = true;
+    } catch (err) {
+        console.warn("Antigravity server no detectat a localhost:8000:", err);
+        el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #ef4444;"></i> <span style="color: #ef4444;">Desconnectat</span>';
+        if (el.antigravityOfflineAlert) el.antigravityOfflineAlert.style.display = 'flex';
+        if (el.antigravityFrameContainer) el.antigravityFrameContainer.style.display = 'none';
+    }
+}
+
+function carregarPanellAntigravity() {
+    if (!antigravityInitialCheckDone || !el.antigravityFrame || el.antigravityFrame.getAttribute('src') === 'about:blank') {
+        comprovarEstatAntigravity(false);
+    }
+}
+
+function recarregarAntigravityFrame() {
+    comprovarEstatAntigravity(true);
+}
 
 function tancarModals() {
     document.querySelectorAll('.modal-backdrop').forEach(m => m.style.display = 'none');
