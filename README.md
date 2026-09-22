@@ -1,7 +1,7 @@
 # 📖 Faristol
 
 > **Banc de treball lliure per a la lectura de PDFs, anotació i síntesi bibliogràfica.**  
-> *Inspirat en Org-Noter, Zotero, Better BibTeX, Better Notes i ZotMoov.*  
+> *Inspirat en Org-Noter, Denote, Zotero, Better BibTeX, Better Notes i ZotMoov.*  
 > *Zero bases de dades opaques, 100% fitxers plans (Markdown + BibTeX + PDFs).*
 
 ---
@@ -22,29 +22,34 @@ Faristol presenta una interfície web moderna de **tres plafons sincronitzats**:
 
 ## 💡 Inspiracions i Llinatge
 
-Faristol no neix del no-res; intenta sintetitzar algunes de les que em pareixen grans idees del programari lliure acadèmic dels darrers anys en una arquitectura moderna basada en la web i en fitxers plans:
+Faristol no neix del no-res; intenta sintetitzar les millors idees del programari lliure acadèmic dels darrers anys en una arquitectura moderna basada en la web i en fitxers plans. 
+
+Si bé és una eina molt més senzilla, directa i sense tanta capacitat o feixuguesa de configuració com tenen totes les eines en què ens basem, hem construït i agafat de cadascuna allò que realment necessitem per a la nostra manera de treballar, llegir i organitzar-nos:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
 │                        INSPIRACIONS DE FARISTOL                           │
 ├───────────────────────────────────────────────────────────────────────────┤
 │ 1. Org-Noter (Emacs)       │ Lectura sincronitzada PDF ↔ Notes a dos plafons│
-│ 2. Zotero & Connector      │ Captura d'articles al navegador en 1 clic    │
-│ 3. Better BibTeX (BBT)     │ Citekeys canòniques 'autorTitolAny' i .bib   │
-│ 4. Better Notes            │ Notes Markdown dedicades per a cada referència│
-│ 5. ZotMoov / ZotFile       │ Gestió i reanomenat de PDFs en carpetes netes │
+│ 2. Denote (Emacs)          │ Fitxers plans, identificadors nets i backlinks │
+│ 3. Zotero & Connector      │ Captura d'articles al navegador en 1 clic    │
+│ 4. Better BibTeX (BBT)     │ Citekeys canòniques 'autorTitolAny' i .bib   │
+│ 5. Better Notes            │ Notes Markdown dedicades per a cada referència│
+│ 6. ZotMoov / ZotFile       │ Gestió i reanomenat de PDFs en carpetes netes │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
 1. **Org-Noter (Emacs):**  
    El paquet llegendari d'Emacs que va inventar la lectura sincronitzada entre un document (PDF/EPUB) i un document de notes, permetent saltar entre el text de la nota i la ubicació exacta del PDF. Faristol modernitza aquesta experiència per a la web amb Markdown estàndard, citacions Pandoc (`[@citekey, p. 12]`) i concordança exacta de text multilínia.
-2. **Zotero & Zotero Connector:**  
+2. **Denote (Emacs - Protesilaos Stavrou):**  
+   La filosofia de presa de notes basada estrictament en fitxers de text pla, convencions de nomenclatura senzilles i predictibles, metadades YAML transparents i enllaços/retroenllaços (*backlinks*) directes. Com a Denote, Faristol rebutja qualsevol base de dades monolítica, dependència opaca o sincronització privativa: el sistema de fitxers és la teua base de dades, i les teues notes sobreviuran a qualsevol programari.
+3. **Zotero & Zotero Connector:**  
    Aprofitem el connector oficial de Zotero per a Firefox i Chrome gràcies a l'emulació de [zoterless](https://github.com/CasimirVictoria/zoterless), que respon al port local `23119` sense necessitat de tindre Zotero Desktop obert.
-3. **Better BibTeX (BBT):**  
+4. **Better BibTeX (BBT):**  
    Totes les publicacions tenen una clau de citació canònica i unívoca, i el fitxer `biblioteca.bib` és la font de veritat bibliogràfica del sistema.
-4. **Better Notes:**  
+5. **Better Notes:**  
    Cada document té la seua pròpia nota associada en Markdown (`@{citekey}.md`) amb metadades YAML (títol, autors, data, tags, enllaç al PDF) i espai per a resums, cites literals i reflexions personals.
-5. **ZotMoov / ZotFile:**  
+6. **ZotMoov / ZotFile:**  
    Els PDFs no queden atrapats en directoris críptics ni en registres SQLite: es desen amb el seu nom canònic `{citekey}.pdf` a la carpeta oberta `~/Documents/Biblioteca/pdfs/`.
 
 ---
@@ -101,9 +106,10 @@ Faristol aprofita la intel·ligència centralitzada de `mcp-server-academic-spai
 
 ## ✨ Característiques Principals
 
-### 1. Lectura a dos plafons estil Org-Noter
+### 1. Lectura i Escriptura a dos plafons (Org-Noter + Denote)
 
 - Obre simultàniament el document PDF i la seua nota d'estudi.
+- **Intercanvi dinàmic de panells (F7 / Alt+W):** prem `F7` o el botó `⇄` per situar l'editor Markdown al centre quan estigues redactant de forma intensiva, deixant el PDF a la dreta com a panell lateral de consulta.
 - Fes clic a qualsevol citació tipus `[@citekey, p. 15]` o referència de pàgina a la nota per **saltar automàticament a la pàgina exacta del PDF**.
 - Subratlla text al PDF i copia'l com a cita textual formatejada directament a la nota amb un sol clic.
 
