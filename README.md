@@ -13,7 +13,7 @@
 El nom prové del mot genuí **faristol** (*el moble o suport inclinat on es col·loca el llibre obert per poder llegir còmodament i prendre notes alhora sense haver d'aguantar-lo amb les mans*): el nostre faristol digital sosté el document PDF davant dels teus ulls mentre prens notes i reflexiones lliurement en el teu quadern de recerca.
 
 Faristol presenta una interfície web moderna de **tres plafons sincronitzats**:
-1. **Plafó lateral de navegació i cerca:** Carpetes i col·leccions virtuals, explorador de notes, explorador de PDFs de la biblioteca, xat d'IA integrat amb NotebookLM i cerca acadèmica federada en 18 bases de dades.
+1. **Plafó lateral de navegació i cerca:** Carpetes i col·leccions virtuals, explorador de notes, explorador de PDFs de la biblioteca, xat d'IA integrat amb NotebookLM i cerca acadèmica federada en 35 bases de dades i repositoris.
 2. **Visor de PDF central (PDF.js personalitzat):** Renderitzat fluid, subratllat persistent, cerca exacta multilínia, navegació per pàgines i extracció automàtica d'anotacions.
 3. **Editor de notes (Vditor Markdown):** Editor WYSIWYG/Markdown amb suport complet per a KaTeX (fórmules matemàtiques), etiquetes `#tags`, retroenllaços bidireccionals (*backlinks/outlinks*), citacions Pandoc `[@citekey, p. X]` i salts instantanis a la pàgina exacta del PDF.
 
@@ -85,8 +85,13 @@ flowchart TD
 
 ### Divisió de responsabilitats:
 - **`zoterless`:** El dimoni de captura en segon pla. Rep les crides del Zotero Connector, cerca el PDF en accés obert (Unpaywall multi-ubicació, OpenAlex, repositoris OJS/DSpace), genera la citekey BBT, actualitza `biblioteca.bib` i crea la nota `@citekey.md`.
-- **`mcp-server-academic-spain`:** El motor de cerca acadèmica federada. Realitza consultes en paral·lel a 18 plataformes (Dialnet, OpenAlex, ERIC, CSIC, arXiv, PubMed, SciELO, DOAJ, Recolecta, TDR, etc.) amb suport per a EduVPN.
+- **`mcp-server-academic-spain`:** El motor de cerca acadèmica federada. Realitza consultes en paral·lel a 35 plataformes i repositoris (Dialnet, OpenAlex, ERIC, CSIC, arXiv, PubMed, SciELO, DOAJ, DBLP, Recolecta, TDR, etc.) amb suport per a EduVPN.
 - **`Faristol`:** El banc de treball unificat on llegeixes el PDF, prens notes al costat, consultes la IA de Google NotebookLM sobre els teus documents i gestiones les teues col·leccions virtuals.
+
+### 🔄 El Cicle Virtuós de Millora Compartida (Font Única)
+Faristol aprofita la intel·ligència centralitzada de `mcp-server-academic-spain`:
+- Quan es descobreix un nou repositori o es corregeix un repte antibot d'una editorial científica (com el cas d'Springer o la resolució exacta per DOI a OpenAlex), **Faristol obté la millora automàticament**.
+- El mateix codi que empren els agents d'IA (Antigravity/Claude) i la consola (`add-paper`) és el que alimenta la pestanya de cerca de Faristol: una millora al motor beneficia simultàniament la IA, el terminal i el teu banc de lectura.
 
 ---
 
@@ -110,7 +115,7 @@ flowchart TD
 
 ### 4. Cerca Acadèmica Federada Integrada
 - Pestanya **[ 🌐 Cerca ]** al plafó lateral.
-- Cerca instantània a través de 18 cercadors acadèmics.
+- Cerca instantània a través de 35 cercadors acadèmics i repositoris.
 - Traducció automàtica local de consultes (català ↔ anglès / castellà) mitjançant Argos Translate.
 - **Importació en 1 clic:** descarrega el PDF en accés obert, l'incorpora a la biblioteca i crea la nota Markdown automàticament.
 
