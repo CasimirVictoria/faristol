@@ -6187,8 +6187,8 @@ button.hasPopupMenu{
 
   --viewer-container-height:0;
   --pdfViewer-padding-bottom:0;
-  --page-margin:1px auto -8px;
-  --page-border:9px solid transparent;
+  --page-margin:0 auto 10px;
+  --page-border:0;
   --spreadHorizontalWrapped-margin-LR:-3.5px;
   --loading-icon-delay:400ms;
   --focus-ring-color:var(--focus-outline-color, light-dark(#0060df, #0df));
@@ -6770,7 +6770,7 @@ button.hasPopupMenu{
   --doorhanger-height:8px;
 
   --main-color:light-dark(rgb(12 12 13), rgb(249 249 250));
-  --body-bg-color:light-dark(rgb(212 212 215), rgb(42 42 46));
+  --body-bg-color:light-dark(rgb(255 255 255), rgb(24 24 27));
   --progressBar-color:light-dark(rgb(10 132 255), rgb(0 96 223));
   --progressBar-bg-color:light-dark(rgb(221 221 222), rgb(40 40 43));
   --progressBar-blend-color:light-dark(rgb(116 177 239), rgb(20 68 133));

@@ -19113,6 +19113,7 @@ const PDFViewerApplication = {
     const pdfViewer = this.pdfViewer = new PDFViewer({
       container,
       viewer,
+      removePageBorders: true,
       viewerAlert: appConfig.viewerAlert,
       eventBus,
       renderingQueue,

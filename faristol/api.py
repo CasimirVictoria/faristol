@@ -34,6 +34,7 @@ from faristol.utils import (
     extraure_identificador_fitxer,
     extraure_tags_nota,
     check_and_import_from_downloads,
+    is_valid_pdf_content,
     obtenir_pdfs_associats_nota,
     obtenir_notes_associades_pdf
 )
@@ -442,28 +443,39 @@ async def rescatar_pdf_nota(filename: str):
         citekey = path.stem[1:] if is_biblio else path.stem
         target_pdf = FONTS_DIR / f"{citekey}.pdf"
 
-        if target_pdf.is_file():
-            return {
-                "status": "ok",
-                "message": f"El PDF {target_pdf.name} ja existeix a la biblioteca.",
-                "filename": target_pdf.name
-            }
-
         titol = _extreure_titol_nota(path, content[:1500])
         m_doi = re.search(r'doi:\s*["\']?([^"\'\n\r]+)["\']?', content, re.IGNORECASE)
         doi = m_doi.group(1).strip() if m_doi else ""
         m_pmid = re.search(r'pmid:?\s*["\']?(\d+)["\']?', content, re.IGNORECASE)
         pmid = m_pmid.group(1).strip() if m_pmid else (citekey[4:] if citekey.startswith("pmid") and citekey[4:].isdigit() else "")
+        m_abstract = re.search(r'#+\s*(?:Resum|Abstract)[\r\n]+([\s\S]*?)(?=\n#+|$)', content, re.IGNORECASE)
+        abstract = m_abstract.group(1).strip() if m_abstract else ""
+
+        if target_pdf.is_file():
+            is_valid, reason = is_valid_pdf_content(target_pdf, title=titol, abstract=abstract, doi=doi)
+            if is_valid:
+                return {
+                    "status": "ok",
+                    "message": f"El PDF {target_pdf.name} ja existeix a la biblioteca i és vàlid.",
+                    "filename": target_pdf.name
+                }
+            else:
+                logger.warning(f"El PDF existent {target_pdf.name} no és vàlid ({reason}). Eliminant el fitxer incomplet...")
+                target_pdf.unlink(missing_ok=True)
 
         # 1. Intentar rescatar des de ~/Downloads
-        trobat = check_and_import_from_downloads(target_pdf, title=titol, doi=doi, pmid=pmid)
+        trobat = check_and_import_from_downloads(target_pdf, title=titol, abstract=abstract, doi=doi, pmid=pmid)
 
         # 2. Si no es troba a Downloads i té DOI, provar descarregar via add-paper / Unpaywall
         if not trobat and doi:
             add_paper_cmd = shutil.which("add-paper") or str(Path.home() / ".local" / "bin" / "add-paper")
             proc = subprocess.run([add_paper_cmd, f"https://doi.org/{doi}"], capture_output=True, text=True, timeout=30)
             if target_pdf.is_file():
-                trobat = True
+                is_val, _ = is_valid_pdf_content(target_pdf, title=titol, abstract=abstract, doi=doi)
+                if is_val:
+                    trobat = True
+                else:
+                    target_pdf.unlink(missing_ok=True)
 
         if trobat and target_pdf.is_file():
             try:

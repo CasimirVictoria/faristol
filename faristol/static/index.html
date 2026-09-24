@@ -170,9 +170,9 @@
 
         /* Left Panel: Library (Notes & PDFs) */
         .panel-library {
-            width: 440px;
+            width: 520px;
             min-width: 200px;
-            max-width: 650px;
+            max-width: 850px;
             background: var(--bg-sidebar);
             border-right: 1px solid var(--border-color);
             display: flex;
@@ -394,7 +394,7 @@
             min-width: 300px;
             display: flex;
             flex-direction: column;
-            background: #475569;
+            background: var(--bg-surface);
             border-right: 1px solid var(--border-color);
             overflow: hidden;
             position: relative;
@@ -488,7 +488,7 @@
             flex: 1;
             width: 100%;
             height: calc(100% - 38px);
-            background: #525659;
+            background: var(--bg-surface);
             position: relative;
             display: flex;
             align-items: center;
@@ -533,9 +533,9 @@
 
         /* Right Panel: Note Editor */
         .panel-editor {
-            width: 440px;
+            width: 540px;
             min-width: 280px;
-            max-width: 750px;
+            max-width: 1000px;
             flex: none;
             flex-shrink: 0;
             background: var(--bg-surface);
@@ -1479,6 +1479,11 @@
                             <option value="boe">⚖️ Legislació Estatal (BOE)</option>
                             <option value="dogv">🏛️ Legislació Valenciana (DOGV)</option>
                             <option value="biomedicina">🩺 Biomedicina & Salut (BioMCP: PubMed, EuropePMC, ClinicalTrials)</option>
+                            <option value="sociopolitica">📊 Sociopolítica, Opinió & Economia (Eurostat, CIS, Eurobaròmetre, GDELT)</option>
+                            <option value="eurostat">🇪🇺 Eurostat (Estadístiques & Macroeconomia UE)</option>
+                            <option value="cis">🗳️ CIS (Baròmetres & Enquestes Espanya)</option>
+                            <option value="eurobarometer">🇪🇺 Eurobaròmetre (Opinió Pública Europea)</option>
+                            <option value="gdelt">🌍 GDELT (Premsa & Esdeveniments Globals)</option>
                         </select>
                         <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap;">
                             <input type="checkbox" id="search-academic-vpn" style="margin: 0;">
@@ -1567,14 +1572,14 @@
         <section class="panel-center" id="panel-center">
             <div class="pdf-toolbar">
                 <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; flex-shrink: 1;">
-                    <button class="btn btn-sm" id="btn-toggle-left" title="Alternar biblioteca (F9)" style="padding: 3px 8px; font-size: 11px;">
+                    <button class="btn btn-sm" id="btn-toggle-left" title="Alternar biblioteca (F9)" style="display: none; padding: 3px 8px; font-size: 11px;">
                         <i class="fa-solid fa-bars-staggered"></i> <span>Biblioteca (F9)</span>
                     </button>
-                    <span style="font-weight: 700; font-size: 13px; color: var(--accent); display: inline-flex; align-items: center; gap: 5px; margin-left: 2px; flex-shrink: 0;">
+                    <span style="display: none; font-weight: 700; font-size: 13px; color: var(--accent); align-items: center; gap: 5px; margin-left: 2px; flex-shrink: 0;">
                         <i class="fa-solid fa-book-open-reader"></i> Faristol
                     </span>
-                    <span style="color: var(--border-color); margin: 0 1px;">|</span>
-                    <div class="pdf-title-label" id="pdf-title-label" style="max-width: 360px;">
+                    <span style="display: none; color: var(--border-color); margin: 0 1px;">|</span>
+                    <div class="pdf-title-label" id="pdf-title-label" style="max-width: 600px;">
                         <i class="fa-solid fa-file-pdf" style="color: #ef4444; flex-shrink: 0;"></i>
                         <span id="pdf-name-text">Cap document carregat</span>
                     </div>
@@ -1592,7 +1597,7 @@
                     <button class="btn btn-sm" id="btn-import-highlights" title="Importar tots els subratllats del PDF a la nota">
                         <i class="fa-solid fa-highlighter" style="color: #eab308;"></i> Subratllats
                     </button>
-                    <button class="btn btn-sm" id="btn-open-okular" title="Obrir amb Okular (F11)">
+                    <button class="btn btn-sm" id="btn-open-okular" title="Obrir amb Okular (F11)" style="display: none;">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i> Okular (F11)
                     </button>
                     <button class="btn btn-sm" id="btn-swap-panels-pdf" title="Intercanviar Editor i PDF (F7 / Alt+W)">
@@ -3755,8 +3760,15 @@ async function obrirPdf(filename, obrirNotaAssociada = true, paginaInicial = 1, 
             if (el.pdfFrame && el.pdfFrame.contentWindow && el.pdfFrame.contentWindow.PDFViewerApplication && el.pdfFrame.contentWindow.PDFViewerApplication.pagesCount > 0) {
                 clearInterval(checkReady);
                 const app = el.pdfFrame.contentWindow.PDFViewerApplication;
-                if (app.pdfViewer && (!app.pdfViewer.currentScaleValue || app.pdfViewer.currentScaleValue === 'auto')) {
-                    app.pdfViewer.currentScaleValue = 'page-width';
+                if (app.pdfViewer) {
+                    app.pdfViewer.removePageBorders = true;
+                    if (app.pdfViewer.viewer) {
+                        app.pdfViewer.viewer.classList.add('removePageBorders');
+                    }
+                    if (!app.pdfViewer.currentScaleValue || app.pdfViewer.currentScaleValue === 'auto') {
+                        app.pdfViewer.currentScaleValue = 'page-width';
+                    }
+                    app.pdfViewer.update();
                 }
                 if (paginaInicial || textDeCerca) {
                     setTimeout(() => {
@@ -5096,18 +5108,18 @@ function configurarSplitters() {
             }
             el.panelEditor.style.width = '';
         } else {
-            if (savedEditor && parseInt(savedEditor, 10) >= 280) {
+            if (savedEditor && parseInt(savedEditor, 10) >= 280 && parseInt(savedEditor, 10) !== 440) {
                 el.panelEditor.style.width = savedEditor + 'px';
             } else {
-                el.panelEditor.style.width = '440px';
+                el.panelEditor.style.width = '540px';
             }
             el.panelCenter.style.width = '';
         }
 
-        if (savedLib && parseInt(savedLib, 10) >= 360) {
+        if (savedLib && parseInt(savedLib, 10) >= 360 && parseInt(savedLib, 10) !== 440) {
             el.panelLibrary.style.width = savedLib + 'px';
         } else {
-            el.panelLibrary.style.width = '440px';
+            el.panelLibrary.style.width = '520px';
         }
     } catch (e) {}
     
@@ -5149,6 +5161,18 @@ function configurarSplitters() {
                         localStorage.setItem('plec_editor_width', el.panelEditor.offsetWidth);
                     }
                 }
+
+                // Notificar al visor PDF que l'amplada ha canviat per recalcular el zoom d'amplada de pàgina
+                if (el.pdfFrame && el.pdfFrame.contentWindow) {
+                    const cw = el.pdfFrame.contentWindow;
+                    if (cw.PDFViewerApplication && cw.PDFViewerApplication.pdfViewer) {
+                        if (cw.PDFViewerApplication.pdfViewer.currentScaleValue === 'page-width' || !cw.PDFViewerApplication.pdfViewer.currentScaleValue) {
+                            cw.PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
+                            cw.PDFViewerApplication.pdfViewer.update();
+                        }
+                    }
+                    cw.dispatchEvent(new Event('resize'));
+                }
             } catch (e) {}
         }
     });
@@ -5156,7 +5180,7 @@ function configurarSplitters() {
     window.addEventListener('mousemove', (e) => {
         if (isDraggingLeft) {
             const workspaceRect = el.workspace.getBoundingClientRect();
-            const newWidth = Math.max(200, Math.min(650, e.clientX - workspaceRect.left));
+            const newWidth = Math.max(200, Math.min(workspaceRect.width - 400, Math.min(850, e.clientX - workspaceRect.left)));
             el.panelLibrary.style.width = newWidth + 'px';
         }
         if (isDraggingRight) {
@@ -5167,7 +5191,7 @@ function configurarSplitters() {
                 const newPdfWidth = Math.max(280, Math.min(workspaceRect.width - 350, offsetRight));
                 el.panelCenter.style.width = newPdfWidth + 'px';
             } else {
-                const newEditorWidth = Math.max(280, Math.min(workspaceRect.width - 350, offsetRight));
+                const newEditorWidth = Math.max(280, Math.min(workspaceRect.width - 350, Math.min(1000, offsetRight)));
                 el.panelEditor.style.width = newEditorWidth + 'px';
             }
         }

@@ -176,7 +176,84 @@ def extraure_tags_nota(contingut_o_nom: str, contingut: Optional[str] = None) ->
             
     return sorted(list(tags))
 
-def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str = "", pmid: str = "") -> bool:
+def is_valid_pdf_content(pdf_path: Path, title: str = "", abstract: str = "", doi: str = "") -> Tuple[bool, str]:
+    """
+    Comprova si un fitxer PDF té contingut acadèmic autèntic i no és una pàgina de bloqueig antibot
+    (com ara Cloudflare, "JavaScript is disabled in your browser", error 403/404 o paywall).
+    Opcionalment valida la concordança de paraules clau amb el títol, abstract o DOI.
+    """
+    if not pdf_path.is_file():
+        return False, "El fitxer no existeix."
+    
+    size = pdf_path.stat().st_size
+    if size < 1000:
+        return False, f"El fitxer és massa petit ({size} bytes)."
+    
+    # Comprovar capçalera PDF
+    try:
+        with open(pdf_path, "rb") as f:
+            header = f.read(10)
+        if not header.startswith(b"%PDF"):
+            return False, "La capçalera del fitxer no correspon a un document PDF vàlid."
+    except Exception as e:
+        return False, f"Error llegint el fitxer: {e}"
+
+    # Extreure text de les 2 primeres pàgines amb pdftotext
+    try:
+        res = subprocess.run(["pdftotext", "-l", "2", str(pdf_path), "-"], capture_output=True, text=True, timeout=3)
+        raw_text = res.stdout if res.returncode == 0 else ""
+    except Exception:
+        raw_text = ""
+
+    text_lower = raw_text.lower()
+
+    # 1. Detecció de marcadors de bloqueig / antibot / paywall
+    block_markers = [
+        "javascript is disabled in your browser",
+        "please enable javascript to proceed",
+        "a required part of this site couldn't load",
+        "attention required! | cloudflare",
+        "just a moment...",
+        "cf-browser-verification",
+        "access denied",
+        "403 forbidden",
+        "subscription required",
+        "purchase this article",
+        "institutional login",
+        "an error occurred while processing your request",
+    ]
+    for marker in block_markers:
+        if marker in text_lower:
+            return False, f"Detectat bloqueig antibot o d'accés: '{marker}'"
+
+    # 2. Si el text és extremadament curt (< 120 caràcters) i la mida < 35KB
+    if len(raw_text.strip()) < 120 and size < 35000:
+        return False, "El document conté massa poc text per a ser un article complet."
+
+    # 3. Comprovació de conflicte de DOI (si el PDF conté explícitament un altre DOI)
+    if doi and raw_text:
+        clean_target_doi = doi.lower().replace("https://doi.org/", "").strip()
+        pdf_dois = [d.rstrip(".,;)>]").lower() for d in re.findall(r"\b10\.\d{4,9}/[^\s\"<>]+", raw_text)]
+        if pdf_dois and not any(clean_target_doi == d or d in clean_target_doi for d in pdf_dois):
+            return False, f"El PDF conté un DOI diferent ({pdf_dois[0]}) al sol·licitat ({clean_target_doi})."
+
+    # 4. Validació de concordança amb l'abstract (si està disponible)
+    if abstract and len(abstract.strip()) > 60 and raw_text:
+        abs_words = set(re.findall(r'\b[a-zA-Z]{6,}\b', abstract.lower()))
+        stopwords = {"between", "through", "during", "without", "should", "further", "however", "results", "article", "present", "studies", "research"}
+        significant_abs_words = [w for w in abs_words if w not in stopwords]
+        
+        if len(significant_abs_words) >= 6:
+            matches = sum(1 for w in significant_abs_words if w in text_lower)
+            if matches == 0:
+                clean_full_title = "".join(c for c in unicodedata.normalize("NFKD", title.lower()) if c.isalnum()) if title else ""
+                clean_pdf_text = "".join(c for c in unicodedata.normalize("NFKD", text_lower) if c.isalnum())
+                if clean_full_title and len(clean_full_title) >= 15 and clean_full_title[:25] not in clean_pdf_text:
+                    return False, "El contingut del PDF no coincideix ni amb el títol ni amb les paraules clau de l'abstract."
+
+    return True, "PDF vàlid"
+
+def check_and_import_from_downloads(target_path: Path, title: str = "", abstract: str = "", doi: str = "", pmid: str = "") -> bool:
     """
     Comprova si l'usuari ha descarregat el PDF manualment a ~/Downloads (p. ex. quan l'editorial
     utilitza Cloudflare o protecció antibot com MDPI, ScienceDirect, etc.).
@@ -219,6 +296,11 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", doi: str
             # Si el PDF de Downloads ja pertany a un altre document de la biblioteca, descartar-lo!
             p_bytes = p.read_bytes()
             if hashlib.md5(p_bytes).hexdigest() in existing_hashes:
+                continue
+
+            # Validar que el PDF de Downloads tinga contingut acadèmic real i no siga un bloqueig antibot
+            is_valid, _ = is_valid_pdf_content(p, title=title, abstract=abstract, doi=doi)
+            if not is_valid:
                 continue
 
             fname_clean = re.sub(r"[^a-zA-Z0-9]", "", _strip_accents(p.name).lower())
