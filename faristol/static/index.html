@@ -1284,99 +1284,84 @@
             <!-- Pestanyes Col·leccions / Notes / PDFs -->
             <div class="tabs-header">
                 <div style="display: flex; gap: 2px; flex: 1; height: 100%;">
-                    <button class="tab-btn" id="tab-collections-btn" title="Col·leccions virtuals (estil Zotero)">
-                        <i class="fa-solid fa-folder-tree"></i> <span>Carpetes</span>
+                    <button class="tab-btn active" id="tab-library-btn" title="Biblioteca completa: carpetes, notes i documents">
+                        <i class="fa-solid fa-book-bookmark" style="color: var(--accent);"></i> <span>Biblioteca</span>
                     </button>
-                    <button class="tab-btn active" id="tab-notes-btn" title="Notes de la biblioteca">
-                        <i class="fa-regular fa-note-sticky"></i> <span>Notes</span>
+                    <button class="tab-btn" id="tab-notebooklm-btn" title="Consultes a Google NotebookLM (RAG)">
+                        <i class="fa-solid fa-brain" style="color: #38bdf8;"></i> <span>NotebookLM</span>
                     </button>
-                    <button class="tab-btn" id="tab-pdfs-btn" title="Documents PDF">
-                        <i class="fa-solid fa-book"></i> <span>PDFs</span>
-                    </button>
-                    <button class="tab-btn" id="tab-notebooklm-btn" title="Consultes a NotebookLM (IA)">
-                        <i class="fa-solid fa-brain" style="color: #38bdf8;"></i> <span>IA</span>
-                    </button>
-                    <button class="tab-btn" id="tab-search-btn" title="Cerca acadèmica federada (18 fonts)">
+                    <button class="tab-btn" id="tab-search-btn" title="Cerca acadèmica federada (35 fonts)">
                         <i class="fa-solid fa-globe" style="color: #10b981;"></i> <span>Cerca</span>
                     </button>
                     <button class="tab-btn" id="tab-antigravity-btn" title="Assistent Antigravity (localhost:8000)" style="display: none;">
                         <i class="fa-solid fa-robot" style="color: #8b5cf6;"></i> <span>Agent</span>
                     </button>
+                    <!-- Àlies ocults per compatibilitat -->
+                    <button id="tab-collections-btn" style="display: none;"></button>
+                    <button id="tab-notes-btn" style="display: none;"></button>
+                    <button id="tab-pdfs-btn" style="display: none;"></button>
                 </div>
                 <button class="btn btn-sm btn-icon-only" id="btn-collapse-sidebar" title="Ocultar biblioteca (F9)" style="padding: 2px 6px; font-size: 11px; margin-bottom: 2px; border: none; background: transparent; color: var(--text-muted);">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
             </div>
 
-            <!-- Cercador -->
-            <div class="library-search-box">
-                <div class="search-input-wrapper">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" class="search-input" id="search-input" placeholder="Filtrar notes o documents... (Ctrl+F)">
-                </div>
-            </div>
-
-            <!-- Barra d'etiquetes -->
-            <div class="tag-filter-bar" id="tag-filter-bar">
-                <span class="tag-chip active" data-tag="">Totes</span>
-            </div>
-
-            <!-- Llista de Col·leccions Virtuals (Zotero) -->
-            <div class="list-container" id="list-collections" style="display: none;">
-                <div class="collections-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface);">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-                        <i class="fa-solid fa-folder-tree" style="color: var(--accent);"></i> Arbre Virtual
-                    </span>
-                    <button class="btn btn-sm" id="btn-new-collection" title="Nova col·lecció virtual" style="padding: 2px 8px; font-size: 11px;">
-                        <i class="fa-solid fa-plus"></i> Nova Carpeta
+            <!-- Vista 1: Biblioteca Unificada -->
+            <div id="panel-library-view" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <!-- Barra de Carpetes / Col·leccions -->
+                <div class="library-collection-bar" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); flex-shrink: 0;">
+                    <button id="btn-toggle-collections" class="btn-collection-selector" title="Explorar i canviar de carpeta virtual" style="display: flex; align-items: center; gap: 7px; background: transparent; border: none; cursor: pointer; color: var(--text-main); font-size: 12px; font-weight: 600; padding: 3px 6px; border-radius: var(--radius-sm); max-width: 320px; overflow: hidden;">
+                        <i class="fa-solid fa-folder-tree" style="color: var(--accent); font-size: 13px;"></i>
+                        <span id="active-collection-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tota la Biblioteca</span>
+                        <i class="fa-solid fa-chevron-down" id="chevron-collections" style="font-size: 10px; color: var(--text-muted); transition: transform 0.2s;"></i>
                     </button>
-                </div>
-
-                <div id="collections-tree-container" style="padding: 6px 4px;">
-                    <!-- Renderitzat dinàmicament -->
-                </div>
-
-                <div id="collection-items-detail" style="display: none; border-top: 1px solid var(--border-color); background: var(--bg-surface); padding: 8px 10px; margin-top: 4px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle);">
-                        <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
-                            <i class="fa-solid fa-folder-open" style="color: #eab308; font-size: 13px;"></i>
-                            <span id="collection-detail-title" style="font-weight: 700; font-size: 12px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
-                        </div>
-                        <div style="display: flex; gap: 4px; flex-shrink: 0;">
-                            <button class="btn btn-sm btn-icon-only" id="btn-open-notebooklm" title="Obrir quadern a NotebookLM (pestanya nova)" style="font-size: 10px; padding: 2px 5px; color: #38bdf8; display: none;">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                            </button>
-                            <button class="btn btn-sm btn-icon-only" id="btn-sync-notebooklm" title="Crear o sincronitzar quadern a NotebookLM" style="font-size: 10px; padding: 2px 5px; color: #38bdf8;">
-                                <i class="fa-solid fa-brain"></i>
-                            </button>
-                            <button class="btn btn-sm btn-icon-only" id="btn-add-to-collection" title="Afegir documents a aquesta carpeta" style="font-size: 10px; padding: 2px 5px;">
-                                <i class="fa-solid fa-plus"></i>
-                            </button>
-                            <button class="btn btn-sm btn-icon-only" id="btn-rename-collection" title="Reanomenar carpeta" style="font-size: 10px; padding: 2px 5px;">
-                                <i class="fa-solid fa-pen"></i>
-                            </button>
-                            <button class="btn btn-sm btn-icon-only" id="btn-delete-collection" title="Eliminar carpeta (sense tocar els fitxers)" style="font-size: 10px; padding: 2px 5px; color: #ef4444;">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="collection-items-list" style="display: flex; flex-direction: column; gap: 4px;">
-                        <!-- Llista d'elements de la col·lecció -->
+                    <div style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">
+                        <span class="col-count-badge" id="library-active-count" title="Total d'elements filtrats">0</span>
+                        <button class="btn btn-sm btn-icon-only" id="btn-new-collection" title="Nova carpeta virtual" style="padding: 2px 6px; font-size: 11px;">
+                            <i class="fa-solid fa-folder-plus"></i>
+                        </button>
                     </div>
                 </div>
+
+                <!-- Desplegable d'Arbre de Carpetes (ocult per defecte) -->
+                <div id="collections-tree-drawer" style="display: none; max-height: 240px; overflow-y: auto; background: var(--bg-hover); border-bottom: 1px solid var(--border-color); padding: 4px 6px; flex-shrink: 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                    <div id="collections-tree-container">
+                        <!-- Renderitzat dinàmicament amb col-tree-node -->
+                    </div>
+                    <div id="collection-items-detail" style="display: none;">
+                        <span id="collection-detail-title" style="display: none;"></span>
+                        <button id="btn-open-notebooklm" style="display: none;"></button>
+                        <button id="btn-sync-notebooklm" style="display: none;"></button>
+                        <button id="btn-add-to-collection" style="display: none;"></button>
+                        <button id="btn-rename-collection" style="display: none;"></button>
+                        <button id="btn-delete-collection" style="display: none;"></button>
+                        <div id="collection-items-list" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Cercador de la biblioteca -->
+                <div class="library-search-box">
+                    <div class="search-input-wrapper">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" class="search-input" id="search-input" placeholder="Filtrar biblioteca... (Ctrl+F)">
+                    </div>
+                </div>
+
+                <!-- Barra d'etiquetes -->
+                <div class="tag-filter-bar" id="tag-filter-bar">
+                    <span class="tag-chip active" data-tag="">Totes</span>
+                </div>
+
+                <!-- Llista d'elements de la biblioteca -->
+                <div class="list-container" id="list-notes" style="flex: 1; overflow-y: auto;">
+                    <div id="notes-collection-banner" style="display: none;"></div>
+                    <div id="notes-items-inner"></div>
+                </div>
             </div>
 
-            <!-- Llista de Notes -->
-            <div class="list-container" id="list-notes">
-                <div id="notes-collection-banner" style="display: none;"></div>
-                <div id="notes-items-inner"></div>
-            </div>
-
-            <!-- Llista de PDFs -->
-            <div class="list-container" id="list-pdfs" style="display: none;">
-                <div id="pdfs-collection-banner" style="display: none;"></div>
-                <div id="pdfs-items-inner"></div>
-            </div>
+            <!-- Contenidors de compatibilitat -->
+            <div id="list-collections" style="display: none;"></div>
+            <div id="list-pdfs" style="display: none;"><div id="pdfs-collection-banner"></div><div id="pdfs-items-inner"></div></div>
 
             <!-- Panell de consulta a NotebookLM -->
             <div class="list-container" id="panel-notebooklm-view" style="display: none; flex-direction: column; height: 100%; overflow: hidden;">
@@ -1914,7 +1899,7 @@ const state = {
     pdfs: [],
     tags: [],
     collections: [],
-    activeTab: 'notes',      // 'collections' | 'notes' | 'pdfs' | 'notebooklm'
+    activeTab: 'library',    // 'library' | 'notebooklm' | 'search' | 'antigravity'
     activeCollectionId: null, // null = all, or col_id
     collapsedCollections: new Set(),
     assigningItem: null,     // { type: 'note'|'pdf', filename: '...' }
@@ -1943,13 +1928,20 @@ const state = {
 
 // Elements DOM
 const el = {
+    tabLibraryBtn: document.getElementById('tab-library-btn'),
+    panelLibraryView: document.getElementById('panel-library-view'),
+    btnToggleCollections: document.getElementById('btn-toggle-collections'),
+    activeCollectionName: document.getElementById('active-collection-name'),
+    chevronCollections: document.getElementById('chevron-collections'),
+    collectionsTreeDrawer: document.getElementById('collections-tree-drawer'),
+    libraryActiveCount: document.getElementById('library-active-count'),
     notesCount: document.getElementById('notes-count'),
     pdfsCount: document.getElementById('pdfs-count'),
     searchInput: document.getElementById('search-input'),
     tagFilterBar: document.getElementById('tag-filter-bar'),
     listNotes: document.getElementById('list-notes'),
     listPdfs: document.getElementById('list-pdfs'),
-    tabCollectionsBtn: document.getElementById('tab-collections-btn'),
+    tabCollectionsBtn: document.getElementById('tab-collections-btn') || document.getElementById('tab-library-btn'),
     listCollections: document.getElementById('list-collections'),
     collectionsTreeContainer: document.getElementById('collections-tree-container'),
     collectionItemsDetail: document.getElementById('collection-items-detail'),
@@ -1965,8 +1957,8 @@ const el = {
     notesItemsInner: document.getElementById('notes-items-inner'),
     pdfsCollectionBanner: document.getElementById('pdfs-collection-banner'),
     pdfsItemsInner: document.getElementById('pdfs-items-inner'),
-    tabNotesBtn: document.getElementById('tab-notes-btn'),
-    tabPdfsBtn: document.getElementById('tab-pdfs-btn'),
+    tabNotesBtn: document.getElementById('tab-notes-btn') || document.getElementById('tab-library-btn'),
+    tabPdfsBtn: document.getElementById('tab-pdfs-btn') || document.getElementById('tab-library-btn'),
     tabNotebooklmBtn: document.getElementById('tab-notebooklm-btn'),
     panelNotebooklmView: document.getElementById('panel-notebooklm-view'),
     tabSearchBtn: document.getElementById('tab-search-btn'),
@@ -2198,8 +2190,10 @@ async function carregarDadesBiblioteca() {
         if (el.pdfsCount) el.pdfsCount.textContent = state.pdfs.length;
         if (el.tabNotesBtn) el.tabNotesBtn.title = `Notes (${state.notes.length})`;
         if (el.tabPdfsBtn) el.tabPdfsBtn.title = `PDFs (${state.pdfs.length})`;
+        if (el.tabLibraryBtn) el.tabLibraryBtn.title = `Biblioteca completa (${state.notes.length} notes · ${state.pdfs.length} PDFs)`;
         el.libraryStatus.textContent = `${state.collections.length} carpetes · ${state.notes.length} notes · ${state.pdfs.length} PDFs`;
         
+        actualitzarNomColleccioActiva();
         renderitzarTags();
         renderitzarColleccions();
         renderitzarLlistaNotes();
@@ -2207,6 +2201,36 @@ async function carregarDadesBiblioteca() {
     } catch (e) {
         console.error("Error carregant biblioteca:", e);
         el.libraryStatus.textContent = "Error connectant amb l'API";
+    }
+}
+
+// --- Helpers Desplegable de Carpetes Virtuals ---
+function alternarDesplegableColleccions() {
+    const drawerEl = document.getElementById('collections-tree-drawer');
+    const chevronEl = document.getElementById('chevron-collections');
+    if (!drawerEl) return;
+    const isOpen = drawerEl.style.display !== 'none';
+    drawerEl.style.display = isOpen ? 'none' : 'block';
+    if (chevronEl) chevronEl.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function actualitzarNomColleccioActiva() {
+    const nameEl = document.getElementById('active-collection-name');
+    const drawerEl = document.getElementById('collections-tree-drawer');
+    const chevronEl = document.getElementById('chevron-collections');
+    if (nameEl) {
+        if (!state.activeCollectionId) {
+            nameEl.textContent = 'Tota la Biblioteca';
+        } else if (state.activeCollectionId === 'unfiled') {
+            nameEl.textContent = 'Sense arxivar';
+        } else {
+            const col = state.collections.find(c => c.id === state.activeCollectionId);
+            nameEl.textContent = col ? col.name : 'Tota la Biblioteca';
+        }
+    }
+    if (drawerEl && drawerEl.style.display !== 'none') {
+        drawerEl.style.display = 'none';
+        if (chevronEl) chevronEl.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -2238,31 +2262,32 @@ function renderitzarTags() {
 }
 
 function canviarPestanya(tabName) {
-    state.activeTab = tabName;
-    el.tabCollectionsBtn.classList.toggle('active', tabName === 'collections');
-    el.tabNotesBtn.classList.toggle('active', tabName === 'notes');
-    el.tabPdfsBtn.classList.toggle('active', tabName === 'pdfs');
+    const isLibrary = (tabName === 'library' || tabName === 'notes' || tabName === 'collections' || tabName === 'pdfs');
+    state.activeTab = isLibrary ? 'library' : tabName;
+    if (el.tabLibraryBtn) el.tabLibraryBtn.classList.toggle('active', isLibrary);
+    if (el.tabCollectionsBtn) el.tabCollectionsBtn.classList.toggle('active', false);
+    if (el.tabNotesBtn) el.tabNotesBtn.classList.toggle('active', false);
+    if (el.tabPdfsBtn) el.tabPdfsBtn.classList.toggle('active', false);
     if (el.tabNotebooklmBtn) el.tabNotebooklmBtn.classList.toggle('active', tabName === 'notebooklm');
     if (el.tabSearchBtn) el.tabSearchBtn.classList.toggle('active', tabName === 'search');
     if (el.tabAntigravityBtn) el.tabAntigravityBtn.classList.toggle('active', tabName === 'antigravity');
     
-    el.listCollections.style.display = tabName === 'collections' ? 'block' : 'none';
-    el.listNotes.style.display = tabName === 'notes' ? 'block' : 'none';
-    el.listPdfs.style.display = tabName === 'pdfs' ? 'block' : 'none';
+    if (el.panelLibraryView) el.panelLibraryView.style.display = isLibrary ? 'flex' : 'none';
+    if (el.listCollections) el.listCollections.style.display = 'none';
+    if (el.listNotes) el.listNotes.style.display = isLibrary ? 'block' : 'none';
+    if (el.listPdfs) el.listPdfs.style.display = 'none';
     if (el.panelNotebooklmView) el.panelNotebooklmView.style.display = tabName === 'notebooklm' ? 'flex' : 'none';
     if (el.panelSearchView) el.panelSearchView.style.display = tabName === 'search' ? 'flex' : 'none';
     if (el.panelAntigravityView) el.panelAntigravityView.style.display = tabName === 'antigravity' ? 'flex' : 'none';
 
     const searchBox = document.querySelector('.library-search-box');
     if (searchBox) searchBox.style.display = (tabName === 'notebooklm' || tabName === 'search' || tabName === 'antigravity') ? 'none' : 'block';
-    el.tagFilterBar.style.display = (tabName === 'notes') ? 'flex' : 'none';
+    if (el.tagFilterBar) el.tagFilterBar.style.display = isLibrary ? 'flex' : 'none';
     
-    if (tabName === 'collections') {
+    if (isLibrary) {
+        actualitzarNomColleccioActiva();
         renderitzarColleccions();
-    } else if (tabName === 'notes') {
         renderitzarLlistaNotes();
-    } else if (tabName === 'pdfs') {
-        renderitzarLlistaPDFs();
     } else if (tabName === 'notebooklm') {
         carregarPanellNotebooklm();
     } else if (tabName === 'search') {
@@ -3107,6 +3132,7 @@ function renderitzarColleccions() {
     `;
     allNode.onclick = () => {
         state.activeCollectionId = null;
+        actualitzarNomColleccioActiva();
         renderitzarColleccions();
         renderitzarLlistaNotes();
         renderitzarLlistaPDFs();
@@ -3133,6 +3159,7 @@ function renderitzarColleccions() {
     `;
     unfiledNode.onclick = () => {
         state.activeCollectionId = 'unfiled';
+        actualitzarNomColleccioActiva();
         renderitzarColleccions();
         renderitzarLlistaNotes();
         renderitzarLlistaPDFs();
@@ -3222,6 +3249,7 @@ function renderitzarColleccions() {
             // Clic a la fila per seleccionar la col·lecció
             node.onclick = () => {
                 state.activeCollectionId = col.id;
+                actualitzarNomColleccioActiva();
                 renderitzarColleccions();
                 renderitzarLlistaNotes();
                 renderitzarLlistaPDFs();
@@ -3253,7 +3281,7 @@ function renderitzarColleccions() {
 
 function renderitzarDetallColleccio(col) {
     if (!el.collectionItemsDetail) return;
-    el.collectionItemsDetail.style.display = 'block';
+    el.collectionItemsDetail.style.display = 'none';
     
     if (col.notebook_id) {
         el.collectionDetailTitle.innerHTML = `${escapeHtml(col.name)} <a href="https://notebooklm.google.com/notebook/${encodeURIComponent(col.notebook_id)}" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: none; margin-left: 5px; cursor: pointer;" title="Obrir quadern a NotebookLM (pestanya nova)"><i class="fa-solid fa-brain"></i> <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 9px; vertical-align: super;"></i></a>`;
@@ -3341,6 +3369,7 @@ function renderitzarDetallColleccio(col) {
 
 function desactivarFiltreColleccio() {
     state.activeCollectionId = null;
+    actualitzarNomColleccioActiva();
     renderitzarColleccions();
     renderitzarLlistaNotes();
     renderitzarLlistaPDFs();
@@ -3357,34 +3386,45 @@ function renderitzarLlistaNotes() {
         const col = state.collections.find(c => c.id === state.activeCollectionId);
         if (col && bannerEl) {
             bannerEl.style.display = 'block';
+            const nlmLink = col.notebook_id ? 
+                `<button class="btn btn-sm btn-icon-only" onclick="event.stopPropagation(); window.open('https://notebooklm.google.com/notebook/${encodeURIComponent(col.notebook_id)}', '_blank');" title="Obrir quadern a NotebookLM" style="font-size: 10px; padding: 2px 5px; color: #38bdf8;"><i class="fa-solid fa-brain"></i></button>` : '';
             bannerEl.innerHTML = `
-                <div class="collection-filter-banner">
-                    <span><i class="fa-solid fa-folder-open"></i> Carpeta: <b>${escapeHtml(col.name)}</b></span>
-                    <button onclick="desactivarFiltreColleccio()" title="Treure filtre per carpeta"><i class="fa-solid fa-xmark"></i></button>
+                <div class="collection-filter-banner" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; background: rgba(234, 179, 8, 0.1); border-bottom: 1px solid rgba(234, 179, 8, 0.2); font-size: 11px;">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                        <i class="fa-solid fa-folder-open" style="color: #eab308;"></i>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Carpeta: <b>${escapeHtml(col.name)}</b></span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        ${nlmLink}
+                        <button onclick="desactivarFiltreColleccio()" title="Treure filtre per carpeta" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 12px; padding: 2px 4px;"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
                 </div>
             `;
         }
     } else if (state.activeCollectionId === 'unfiled' && bannerEl) {
         bannerEl.style.display = 'block';
         bannerEl.innerHTML = `
-            <div class="collection-filter-banner">
-                <span><i class="fa-solid fa-inbox"></i> Filtrant: <b>Sense arxivar</b></span>
-                <button onclick="desactivarFiltreColleccio()" title="Treure filtre"><i class="fa-solid fa-xmark"></i></button>
+            <div class="collection-filter-banner" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; background: rgba(100, 116, 139, 0.1); border-bottom: 1px solid rgba(100, 116, 139, 0.2); font-size: 11px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-inbox" style="color: #64748b;"></i>
+                    <span>Filtrant: <b>Sense arxivar</b></span>
+                </div>
+                <button onclick="desactivarFiltreColleccio()" title="Treure filtre" style="background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 12px; padding: 2px 4px;"><i class="fa-solid fa-xmark"></i></button>
             </div>
         `;
     } else if (bannerEl) {
         bannerEl.style.display = 'none';
     }
 
-    const q = state.searchQuery.toLowerCase().trim();
+    const q = (state.searchQuery || '').toLowerCase().trim();
     
     let filtrades = state.notes.filter(n => {
-        const matchQ = !q || n.title.toLowerCase().includes(q) || n.filename.toLowerCase().includes(q);
-        const matchTag = !state.activeTagFilter || n.tags.includes(state.activeTagFilter);
+        const matchQ = !q || (n.title && n.title.toLowerCase().includes(q)) || (n.filename && n.filename.toLowerCase().includes(q));
+        const matchTag = !state.activeTagFilter || (n.tags && n.tags.includes(state.activeTagFilter));
         return matchQ && matchTag;
     });
 
-    // Filtre per col·lecció activa
+    // Filtre per col·lecció activa per a les notes
     if (state.activeCollectionId && state.activeCollectionId !== 'unfiled') {
         const col = state.collections.find(c => c.id === state.activeCollectionId);
         if (col) {
@@ -3396,12 +3436,52 @@ function renderitzarLlistaNotes() {
         state.collections.forEach(c => (c.notes || []).forEach(n => notesInCols.add(n)));
         filtrades = filtrades.filter(n => !notesInCols.has(n.filename));
     }
+
+    // PDFs a incloure (òrfens o pertanyents a la col·lecció sense nota) si no hi ha filtre d'etiquetes actiu
+    let pdfsAIncloure = [];
+    if (!state.activeTagFilter) {
+        let candidatsPdfs = state.pdfs;
+        if (state.activeCollectionId && state.activeCollectionId !== 'unfiled') {
+            const col = state.collections.find(c => c.id === state.activeCollectionId);
+            if (col) {
+                const colPdfs = new Set(col.pdfs || []);
+                candidatsPdfs = state.pdfs.filter(p => colPdfs.has(p.filename));
+            }
+        } else if (state.activeCollectionId === 'unfiled') {
+            const pdfsInCols = new Set();
+            state.collections.forEach(c => (c.pdfs || []).forEach(p => pdfsInCols.add(p)));
+            candidatsPdfs = state.pdfs.filter(p => !pdfsInCols.has(p.filename));
+        }
+
+        const existingNoteStems = new Set(state.notes.map(n => (n.filename || '').replace(/\.(md|org)$/i, '').replace(/^@/, '')));
+        
+        pdfsAIncloure = candidatsPdfs.filter(pdf => {
+            const matchQ = !q || pdf.filename.toLowerCase().includes(q);
+            if (!matchQ) return false;
+            
+            const stem = pdf.filename.replace(/\.pdf$/i, '');
+            if (state.activeCollectionId && state.activeCollectionId !== 'unfiled') {
+                const teNotaAColleccio = filtrades.some(n => {
+                    const nStem = (n.filename || '').replace(/\.(md|org)$/i, '').replace(/^@/, '');
+                    return nStem === stem;
+                });
+                return !teNotaAColleccio;
+            }
+            return !existingNoteStems.has(stem);
+        });
+    }
+
+    const totalElements = filtrades.length + pdfsAIncloure.length;
+    if (el.libraryActiveCount) {
+        el.libraryActiveCount.textContent = totalElements;
+    }
     
-    if (filtrades.length === 0) {
-        innerEl.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-subtle);">No s\'han trobat notes</div>';
+    if (totalElements === 0) {
+        innerEl.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-subtle);">No s\'han trobat documents</div>';
         return;
     }
     
+    // 1. Renderitzar notes
     filtrades.forEach(nota => {
         const item = document.createElement('div');
         const isSelected = nota.filename === state.activeNoteFilename;
@@ -3445,6 +3525,46 @@ function renderitzarLlistaNotes() {
         `;
         
         item.onclick = () => obrirNota(nota.filename);
+        innerEl.appendChild(item);
+    });
+
+    // 2. Renderitzar PDFs orfes o addicionals
+    pdfsAIncloure.forEach(pdf => {
+        const item = document.createElement('div');
+        const isSelected = pdf.filename === state.activePdfFilename;
+        item.className = `list-item ${isSelected ? 'selected' : ''}`;
+        
+        // Habilitar Drag & Drop
+        item.draggable = true;
+        item.ondragstart = (e) => {
+            e.dataTransfer.setData('application/json', JSON.stringify({ type: 'pdf', filename: pdf.filename }));
+            e.dataTransfer.effectAllowed = 'copy';
+        };
+
+        const sizeMb = (pdf.size / (1024 * 1024)).toFixed(1) + ' MB';
+        
+        // Badges de col·leccions
+        const colMatches = state.collections.filter(c => (c.pdfs || []).includes(pdf.filename));
+        const colBadges = colMatches.map(c => `<span class="item-col-tag" title="Carpeta: ${escapeHtml(c.name)}"><i class="fa-solid fa-folder" style="color: #eab308;"></i> ${escapeHtml(c.name)}</span>`).join(' ');
+
+        item.innerHTML = `
+            <div class="list-item-title">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="fa-solid fa-file-pdf" style="color: #ef4444; margin-right: 4px;"></i> ${escapeHtml(pdf.filename)}</span>
+                <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                    <span class="badge-pdf" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px;"><i class="fa-solid fa-file-pdf"></i> PDF</span>
+                    <button class="btn-col-assign" title="Assignar a carpetes virtuals" onclick="event.stopPropagation(); obrirModalAssignarColleccions('pdf', '${escapeHtml(pdf.filename)}')">
+                        <i class="fa-solid fa-folder-plus"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="list-item-meta">
+                <span>${sizeMb}</span>
+                <span style="font-size: 10px; color: var(--text-subtle);"><i class="fa-solid fa-plus"></i> Crear nota</span>
+            </div>
+            ${colBadges ? `<div style="display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px;">${colBadges}</div>` : ''}
+        `;
+        
+        item.onclick = () => obrirPdf(pdf.filename);
         innerEl.appendChild(item);
     });
 }
@@ -4244,6 +4364,11 @@ async function rescatarPdfNota(filename) {
 // --- Dreceres i Esdeveniments ---
 function configurarEvents() {
     // Pestanyes biblioteca
+    if (el.tabLibraryBtn) el.tabLibraryBtn.onclick = () => canviarPestanya('library');
+    if (el.btnToggleCollections) el.btnToggleCollections.onclick = (e) => {
+        e.stopPropagation();
+        alternarDesplegableColleccions();
+    };
     el.tabCollectionsBtn.onclick = () => canviarPestanya('collections');
     el.tabNotesBtn.onclick = () => canviarPestanya('notes');
     el.tabPdfsBtn.onclick = () => canviarPestanya('pdfs');
@@ -4412,12 +4537,24 @@ function configurarEvents() {
     // Cercador
     el.searchInput.addEventListener('input', (e) => {
         state.searchQuery = e.target.value;
-        if (state.activeTab === 'collections') {
+        if (state.activeTab === 'library' || state.activeTab === 'notes' || state.activeTab === 'collections') {
             renderitzarColleccions();
-        } else if (state.activeTab === 'notes') {
             renderitzarLlistaNotes();
         } else {
             renderitzarLlistaPDFs();
+        }
+    });
+
+    // Tancar desplegable de carpetes en fer clic a fora
+    document.addEventListener('click', (e) => {
+        const drawerEl = document.getElementById('collections-tree-drawer');
+        const toggleBtn = document.getElementById('btn-toggle-collections');
+        if (drawerEl && drawerEl.style.display !== 'none') {
+            if (!drawerEl.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target))) {
+                drawerEl.style.display = 'none';
+                const chevronEl = document.getElementById('chevron-collections');
+                if (chevronEl) chevronEl.style.transform = 'rotate(0deg)';
+            }
         }
     });
     
