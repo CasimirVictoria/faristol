@@ -1270,10 +1270,117 @@
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
         }
 
+        /* --- Mode Mòbil / Pantalla Tàctil (< 900px) --- */
+        .mobile-bottom-nav {
+            display: none;
+            height: 54px;
+            background: var(--bg-surface);
+            border-top: 1px solid var(--border-color);
+            flex-shrink: 0;
+            z-index: 9000;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 6px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+        }
 
+        .mobile-nav-btn {
+            flex: 1;
+            height: 100%;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            cursor: pointer;
+            transition: color 0.15s ease, background 0.15s ease;
+            border-top: 3px solid transparent;
+        }
+
+        .mobile-nav-btn i {
+            font-size: 16px;
+        }
+
+        .mobile-nav-btn.active {
+            color: var(--accent);
+            border-top-color: var(--accent);
+            background: var(--accent-light);
+        }
+
+        @media (max-width: 900px) {
+            .app-wrapper {
+                height: 100dvh;
+            }
+            .workspace {
+                height: calc(100dvh - 54px) !important;
+                flex: 1;
+            }
+            .mobile-bottom-nav {
+                display: flex !important;
+            }
+            #splitter-left,
+            #splitter-right,
+            #btn-collapse-sidebar,
+            #btn-swap-panels-pdf,
+            #btn-swap-panels-editor,
+            #btn-close-pdf,
+            #btn-open-kate,
+            #btn-open-okular,
+            #btn-shortcuts {
+                display: none !important;
+            }
+            .panel-library,
+            .panel-center,
+            .panel-editor {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                border-right: none !important;
+                border-left: none !important;
+            }
+            body[data-mobile-tab="library"] .panel-library {
+                display: flex !important;
+            }
+            body[data-mobile-tab="library"] .panel-center,
+            body[data-mobile-tab="library"] .panel-editor {
+                display: none !important;
+            }
+            body[data-mobile-tab="reader"] .panel-center {
+                display: flex !important;
+            }
+            body[data-mobile-tab="reader"] .panel-library,
+            body[data-mobile-tab="reader"] .panel-editor {
+                display: none !important;
+            }
+            body[data-mobile-tab="note"] .panel-editor {
+                display: flex !important;
+            }
+            body[data-mobile-tab="note"] .panel-library,
+            body[data-mobile-tab="note"] .panel-center {
+                display: none !important;
+            }
+            .pdf-toolbar,
+            .editor-toolbar {
+                overflow-x: auto;
+                scrollbar-width: none;
+                gap: 6px;
+            }
+            .pdf-floating-menu {
+                max-width: 94vw;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                padding: 6px 8px;
+            }
+        }
     </style>
 </head>
-<body>
+<body data-mobile-tab="library">
 
 <div class="app-wrapper">
     <!-- Workspace 3 Panells (Sense barra superior, 100vh neta) -->
@@ -1287,14 +1394,14 @@
                     <button class="tab-btn active" id="tab-library-btn" title="Biblioteca completa: carpetes, notes i documents">
                         <i class="fa-solid fa-book-bookmark" style="color: var(--accent);"></i> <span>Biblioteca</span>
                     </button>
+                    <button class="tab-btn" id="tab-antigravity-btn" title="Assistent d'Intel·ligència Artificial Antigravity (agy-bridge)">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color: #a855f7;"></i> <span>IA</span>
+                    </button>
                     <button class="tab-btn" id="tab-notebooklm-btn" title="Consultes a Google NotebookLM (RAG)">
                         <i class="fa-solid fa-brain" style="color: #38bdf8;"></i> <span>NotebookLM</span>
                     </button>
                     <button class="tab-btn" id="tab-search-btn" title="Cerca acadèmica federada (35 fonts)">
                         <i class="fa-solid fa-globe" style="color: #10b981;"></i> <span>Cerca</span>
-                    </button>
-                    <button class="tab-btn" id="tab-antigravity-btn" title="Assistent Antigravity (localhost:8000)" style="display: none;">
-                        <i class="fa-solid fa-robot" style="color: #8b5cf6;"></i> <span>Agent</span>
                     </button>
                     <!-- Àlies ocults per compatibilitat -->
                     <button id="tab-collections-btn" style="display: none;"></button>
@@ -1476,6 +1583,9 @@
                             <option value="legislacio">⚖️ Legislació (BOE Estatal & DOGV Valencià)</option>
                             <option value="boe">⚖️ Legislació Estatal (BOE)</option>
                             <option value="dogv">🏛️ Legislació Valenciana (DOGV)</option>
+                            <option value="opendata">🏛️ Dades Obertes Espanya (datos.gob.es, BDNS Subvencions, INE)</option>
+                            <option value="europarl">🇪🇺 Parlament Europeu (Debats & Discursos Oficials)</option>
+                            <option value="catastro">🏠 Cadastre d'Espanya & Immobiliari (Sede Catastro & La Safor)</option>
                             <option value="biomedicina">🩺 Biomedicina & Salut (BioMCP: PubMed, EuropePMC, ClinicalTrials)</option>
                             <option value="sociopolitica">📊 Sociopolítica, Opinió & Economia (Eurostat, CIS, Eurobaròmetre, GDELT)</option>
                             <option value="eurostat">🇪🇺 Eurostat (Estadístiques & Macroeconomia UE)</option>
@@ -1503,14 +1613,13 @@
                 </div>
             </div>
 
-            <!-- Panell 6: Assistent Antigravity (Localhost 8000) -->
+            <!-- Panell 4: Assistent IA Antigravity (agy-bridge) -->
             <div class="list-container" id="panel-antigravity-view" style="display: none; flex-direction: column; height: 100%; overflow: hidden; padding: 0;">
-                <!-- Barra d'eines / estat Antigravity -->
                 <div style="padding: 6px 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; font-size: 11px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-robot" style="color: #8b5cf6; font-size: 12px;"></i>
-                        <strong style="color: var(--text-main);">Antigravity</strong>
-                        <span id="antigravity-status-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 600; background: rgba(139, 92, 246, 0.12); color: #8b5cf6;">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color: #a855f7; font-size: 12px;"></i>
+                        <strong style="color: var(--text-main);">Antigravity IA</strong>
+                        <span id="antigravity-status-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 600; background: rgba(168, 85, 247, 0.12); color: #a855f7;">
                             <i class="fa-solid fa-circle" style="font-size: 5px;"></i> <span>Verificant...</span>
                         </span>
                     </div>
@@ -1518,21 +1627,20 @@
                         <button class="btn btn-sm btn-icon-only" id="btn-reload-antigravity" title="Recarregar xat d'Antigravity" style="padding: 2px 5px; font-size: 10px;">
                             <i class="fa-solid fa-rotate-right"></i>
                         </button>
-                        <a href="http://localhost:8000" target="_blank" class="btn btn-sm btn-icon-only" title="Obrir en una pestanya nova de Firefox" style="padding: 2px 5px; font-size: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                        <a id="btn-open-antigravity-tab" href="http://localhost:8000" target="_blank" class="btn btn-sm btn-icon-only" title="Obrir en una pestanya nova" style="padding: 2px 5px; font-size: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted);">
                             <i class="fa-solid fa-arrow-up-right-from-square"></i>
                         </a>
                     </div>
                 </div>
 
-                <!-- Estat Offline / Error (si localhost:8000 no està actiu) -->
                 <div id="antigravity-offline-alert" style="display: none; padding: 24px 16px; text-align: center; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--bg-surface);">
                     <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 22px;">
                         <i class="fa-solid fa-plug-circle-xmark"></i>
                     </div>
                     <div>
-                        <div style="font-weight: 600; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Servidor no detectat a localhost:8000</div>
+                        <div style="font-weight: 600; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Servidor no detectat al port 8000</div>
                         <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; max-width: 280px; margin: 0 auto;">
-                            Assegura't que l'agent Antigravity CLI o el servidor web s'està executant a <code>http://localhost:8000</code>.
+                            Assegura't que el servei <code>agy-bridge.service</code> s'està executant correctament.
                         </div>
                     </div>
                     <button class="btn btn-sm btn-primary" id="btn-retry-antigravity" style="padding: 4px 12px; font-size: 11px; gap: 6px;">
@@ -1540,7 +1648,6 @@
                     </button>
                 </div>
 
-                <!-- Contenidor de l'Iframe (mantingut viu al DOM per preservar la conversa) -->
                 <div id="antigravity-frame-container" style="flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; background: var(--bg-surface);">
                     <iframe id="antigravity-frame" src="about:blank" style="width: 100%; height: 100%; border: none; display: block;" allow="clipboard-read; clipboard-write"></iframe>
                 </div>
@@ -1553,9 +1660,11 @@
                     <button class="btn btn-sm" id="btn-theme-toggle-lib" title="Canviar tema clar/fosc (Alt+T)" style="padding: 2px 6px; font-size: 11px;">
                         <i class="fa-solid fa-moon" id="theme-toggle-icon-lib"></i>
                     </button>
+                    <!-- Botó Agent desactivat
                     <button class="btn btn-sm" id="btn-toggle-antigravity-tab" title="Mostrar/amagar pestanya de l'Agent Antigravity (Alt+A)" style="padding: 2px 6px; font-size: 11px; border: 1px solid transparent;">
                         <i class="fa-solid fa-robot" style="color: #8b5cf6;"></i>
                     </button>
+                    -->
                     <button class="btn btn-sm" id="btn-refresh-lib" title="Recarregar">
                         <i class="fa-solid fa-rotate"></i>
                     </button>
@@ -1698,13 +1807,33 @@
         </section>
     </main>
 
+    <!-- Barra de navegació inferior per a Mòbil / Pantalla Tàctil -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+        <button type="button" class="mobile-nav-btn active" data-tab="library" onclick="window.canviarPestanyaMobil('library')">
+            <i class="fa-solid fa-book-bookmark"></i>
+            <span>Biblioteca</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="reader" onclick="window.canviarPestanyaMobil('reader')">
+            <i class="fa-solid fa-book-open-reader"></i>
+            <span>Lectura</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="note" onclick="window.canviarPestanyaMobil('note')">
+            <i class="fa-solid fa-file-pen"></i>
+            <span>Nota</span>
+        </button>
+    </nav>
+
 </div>
 
 <!-- Píndola flotant per a seguir enllaços [[...]] o pàgines PDF -->
 <div id="vditor-link-pill" class="vditor-link-pill"></div>
 
-<!-- Menú flotant d'acció ràpida sobre la selecció al visor PDF -->
+<!-- Menú flotant d'acció ràpida sobre la selecció al visor PDF / Snapshot HTML -->
 <div id="pdf-floating-menu" class="pdf-floating-menu" style="display: none;">
+    <button class="pdf-float-btn" id="pdf-float-highlight" title="Subratllar en groc al document">
+        <i class="fa-solid fa-highlighter" style="color: #fde047;"></i> Subratllar
+    </button>
+    <div class="pdf-float-sep"></div>
     <button class="pdf-float-btn" id="pdf-float-cite" title="Inserir cita a la nota (Org-Noter)">
         <i class="fa-solid fa-quote-left"></i> Citar
     </button>
@@ -3652,7 +3781,10 @@ function renderitzarLlistaPDFs() {
         };
 
         // Comprovar si té nota associada
-        const stem = pdf.filename.replace(/\.pdf$/i, '');
+        const stem = pdf.filename.replace(/\.(pdf|html?)$/i, '');
+        const isHtmlDoc = /\.html?$/i.test(pdf.filename);
+        const docIcon = isHtmlDoc ? 'fa-globe' : 'fa-file-pdf';
+        const docColor = isHtmlDoc ? '#0ea5e9' : '#ef4444';
         const hasNote = state.notes.some(n => n.filename === `@${stem}.md` || n.filename === `${stem}.md`);
         const noteBadge = hasNote ? 
             `<span class="badge-note-exists"><i class="fa-solid fa-check"></i> Nota</span>` : 
@@ -3666,7 +3798,7 @@ function renderitzarLlistaPDFs() {
 
         item.innerHTML = `
             <div class="list-item-title">
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="fa-solid fa-file-pdf" style="color: #ef4444; margin-right: 4px;"></i> ${escapeHtml(pdf.filename)}</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><i class="fa-solid ${docIcon}" style="color: ${docColor}; margin-right: 4px;"></i> ${escapeHtml(pdf.filename)}</span>
                 <button class="btn-col-assign" title="Assignar a carpetes virtuals" onclick="event.stopPropagation(); obrirModalAssignarColleccions('pdf', '${escapeHtml(pdf.filename)}')">
                     <i class="fa-solid fa-folder-plus"></i>
                 </button>
@@ -3820,9 +3952,17 @@ async function obrirNota(filename, carregarPdfAssociat = true, afegirHistorial =
             if (data.pdfs && data.pdfs.length > 0) {
                 const primerPdf = data.pdfs[0];
                 obrirPdf(primerPdf.filename || primerPdf.name, false);
+                if (window.innerWidth <= 900) {
+                    window.canviarPestanyaMobil('reader');
+                }
             } else {
                 netejarVisorPdf();
+                if (window.innerWidth <= 900) {
+                    window.canviarPestanyaMobil('note');
+                }
             }
+        } else if (window.innerWidth <= 900 && document.body.getAttribute('data-mobile-tab') === 'library') {
+            window.canviarPestanyaMobil('note');
         }
         
         actualitzarUrlParametres();
@@ -3853,6 +3993,16 @@ async function crearNotaDesDeNom(filename) {
         console.error("Error creant nota:", e);
     }
 }
+
+// --- Navegació Mòbil / Pantalla Tàctil (< 900px) ---
+window.canviarPestanyaMobil = function(tabName) {
+    document.body.setAttribute('data-mobile-tab', tabName);
+    const navBtns = document.querySelectorAll('#mobile-bottom-nav .mobile-nav-btn');
+    navBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
+    });
+    amagarMenuFlotantPdf();
+};
 
 // --- Notificació de Guardat d'Anotacions PDF des de l'iframe ---
 window.notificarGuardatPdf = function(status, msg) {
@@ -3887,13 +4037,46 @@ async function obrirPdf(filename, obrirNotaAssociada = true, paginaInicial = 1, 
         pdfBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i> <span>Anotacions al dia</span>';
     }
     
-    // Carregar directament a l'iframe amb el visor oficial de Mozilla PDF.js amb cache-buster i auto-guardat
+    // Carregar a l'iframe: directament si és un Snapshot HTML (.html/.htm), o via Mozilla PDF.js si és .pdf
+    const isHtmlSnap = /\.html?$/i.test(filename);
     const streamUrl = `/api/pdf/stream?path=${encodeURIComponent(filename)}&_t=${Date.now()}`;
     const pageHash = (paginaInicial && paginaInicial > 1) ? `#page=${paginaInicial}&zoom=page-width` : '#zoom=page-width';
-    const viewerUrl = `/static/libs/pdfjs_dist/web/viewer.html?file=${encodeURIComponent(streamUrl)}&nom_pdf=${encodeURIComponent(filename)}${pageHash}`;
+    const viewerUrl = isHtmlSnap
+        ? streamUrl
+        : `/static/libs/pdfjs_dist/web/viewer.html?file=${encodeURIComponent(streamUrl)}&nom_pdf=${encodeURIComponent(filename)}${pageHash}`;
     el.pdfFrame.src = viewerUrl;
     el.pdfFrame.onload = () => {
         vincularEventsIframePdf();
+        if (isHtmlSnap) {
+            try {
+                const cd = el.pdfFrame.contentDocument;
+                if (cd && cd.head && !cd.getElementById('faristol-snap-style')) {
+                    const st = cd.createElement('style');
+                    st.id = 'faristol-snap-style';
+                    st.textContent = `
+                        mark.faristol-highlight {
+                            background-color: rgba(250, 204, 21, 0.45) !important;
+                            color: inherit !important;
+                            border-bottom: 2px solid #eab308;
+                            border-radius: 2px;
+                            padding: 0 1px;
+                            cursor: pointer;
+                            transition: background-color 0.15s;
+                        }
+                        mark.faristol-highlight:hover {
+                            background-color: rgba(250, 204, 21, 0.75) !important;
+                        }
+                    `;
+                    cd.head.appendChild(st);
+                }
+            } catch (e) {}
+            if (textDeCerca) {
+                setTimeout(() => {
+                    saltarAPaginaPdf(1, textDeCerca);
+                }, 150);
+            }
+            return;
+        }
         let count = 0;
         const checkReady = setInterval(() => {
             count++;
@@ -3922,10 +4105,13 @@ async function obrirPdf(filename, obrirNotaAssociada = true, paginaInicial = 1, 
     
     // Assegurar que el panell central està visible
     el.panelCenter.classList.remove('collapsed');
+    if (window.innerWidth <= 900) {
+        window.canviarPestanyaMobil('reader');
+    }
     renderitzarLlistaPDFs();
     
     if (obrirNotaAssociada) {
-        const stem = filename.replace(/\.pdf$/i, '');
+        const stem = filename.replace(/\.(pdf|html?)$/i, '');
         const cleanStem = stem.replace(/[^a-zA-Z0-9_\-]/g, '');
         
         // Cercar si ja tenim la nota a state.notes
@@ -4009,6 +4195,14 @@ function vincularEventsIframePdf() {
 
         cd.removeEventListener('mouseup', comprovarSeleccio);
         cd.addEventListener('mouseup', comprovarSeleccio);
+        cd.removeEventListener('touchend', comprovarSeleccio);
+        cd.addEventListener('touchend', () => setTimeout(comprovarSeleccio, 120), { passive: true });
+        cd.removeEventListener('selectionchange', comprovarSeleccio);
+        cd.addEventListener('selectionchange', () => {
+            if (window.innerWidth <= 900) {
+                comprovarSeleccio();
+            }
+        });
 
         cd.addEventListener('keyup', (e) => {
             if (e.shiftKey || e.key === 'Shift') comprovarSeleccio();
@@ -4029,9 +4223,9 @@ function vincularEventsIframePdf() {
         }
         cw.addEventListener('scroll', amagarMenuFlotantPdf, { passive: true });
 
-        // Clic a un subratllat existent al PDF -> Salt a la cita corresponent a la nota
+        // Clic a un subratllat existent al PDF o Snapshot HTML -> Salt a la cita corresponent a la nota
         cd.addEventListener('click', (e) => {
-            const annotEl = e.target.closest('.highlightAnnotation, .highlight, [data-annotation-id]');
+            const annotEl = e.target.closest('.highlightAnnotation, .highlight, [data-annotation-id], mark.faristol-highlight');
             if (annotEl) {
                 const pageEl = annotEl.closest('.page');
                 const pageNum = pageEl ? parseInt(pageEl.getAttribute('data-page-number'), 10) : (cw.PDFViewerApplication?.page || 1);
@@ -4052,7 +4246,7 @@ function mostrarMenuFlotantPdf(rect, text, pag) {
     estatSeleccioPdf.page = pag;
 
     const iframeRect = el.pdfFrame.getBoundingClientRect();
-    const menuWidth = 260;
+    const menuWidth = 340;
     const menuHeight = 36;
 
     // Posició X centrada sobre la selecció
@@ -4079,10 +4273,54 @@ function amagarMenuFlotantPdf() {
     }
 }
 
+async function desarSnapshotHtmlActual() {
+    try {
+        if (!el.pdfFrame || !el.pdfFrame.contentDocument || !state.activePdfFilename) return;
+        if (!/\.html?$/i.test(state.activePdfFilename)) return;
+        window.notificarGuardatPdf('saving', 'Guardant snapshot...');
+        const htmlOut = '<!DOCTYPE html>\n' + el.pdfFrame.contentDocument.documentElement.outerHTML;
+        const res = await fetch(`/api/plec/save-pdf?filename=${encodeURIComponent(state.activePdfFilename)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            body: htmlOut
+        });
+        if (res.ok) {
+            window.notificarGuardatPdf('saved', 'Subratllat guardat a disc');
+        } else {
+            window.notificarGuardatPdf('error', 'Error guardant snapshot');
+        }
+    } catch (e) {
+        console.error("Error guardant snapshot HTML:", e);
+    }
+}
+
 function resaltarSeleccioAlPdf() {
     try {
         if (!el.pdfFrame || !el.pdfFrame.contentWindow) return;
         const cw = el.pdfFrame.contentWindow;
+        const cd = el.pdfFrame.contentDocument;
+
+        // Cas 1: Snapshot HTML (.html)
+        if (state.activePdfFilename && /\.html?$/i.test(state.activePdfFilename) && cd) {
+            const range = estatSeleccioPdf.range;
+            if (!range) return;
+            const mark = cd.createElement('mark');
+            mark.className = 'faristol-highlight';
+            mark.setAttribute('data-faristol-ts', Date.now().toString());
+            try {
+                range.surroundContents(mark);
+            } catch (eSurround) {
+                const frag = range.extractContents();
+                mark.appendChild(frag);
+                range.insertNode(mark);
+            }
+            const sel = cw.getSelection ? cw.getSelection() : null;
+            if (sel) sel.removeAllRanges();
+            desarSnapshotHtmlActual();
+            return;
+        }
+
+        // Cas 2: Visor PDF.js (.pdf)
         const app = cw.PDFViewerApplication;
         if (!app) return;
 
@@ -4143,11 +4381,40 @@ function actualitzarEstatGuardat(tipus, text) {
     el.editorStatusBadge.innerHTML = `<i class="fa-solid ${iconClass}"></i> <span>${text}</span>`;
 }
 
-// --- Salts Bidireccionals PDF <-> Nota ---
+// --- Salts Bidireccionals PDF / Snapshot HTML <-> Nota ---
 function saltarAPaginaPdf(pageNum, textDeCerca = null) {
     try {
+        if (window.innerWidth <= 900 && window.canviarPestanyaMobil) {
+            window.canviarPestanyaMobil('reader');
+        }
         if (!el.pdfFrame || !el.pdfFrame.contentWindow) return;
         const cw = el.pdfFrame.contentWindow;
+        const cd = el.pdfFrame.contentDocument;
+
+        // Cas Snapshot HTML (.html)
+        if (state.activePdfFilename && /\.html?$/i.test(state.activePdfFilename) && cd) {
+            if (textDeCerca) {
+                const net = textDeCerca.replace(/^[*_~`"'«»“„>\s:;]+|[*_~`"'«»”\s:;]+$/g, '').trim();
+                const fragment = net.split(/\s+/).filter(Boolean).slice(0, 6).join(' ');
+                if (fragment) {
+                    const marks = cd.querySelectorAll('mark.faristol-highlight, p, li, blockquote, h1, h2, h3');
+                    for (const m of marks) {
+                        if (m.textContent && m.textContent.toLowerCase().includes(fragment.toLowerCase())) {
+                            m.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            const origBg = m.style.backgroundColor;
+                            m.style.backgroundColor = 'rgba(56, 189, 248, 0.45)';
+                            setTimeout(() => { m.style.backgroundColor = origBg; }, 2000);
+                            return;
+                        }
+                    }
+                    if (typeof cw.find === 'function') {
+                        cw.find(fragment, false, false, true);
+                    }
+                }
+            }
+            return;
+        }
+
         if (!cw.PDFViewerApplication) return;
 
         // 1. Canviar de pàgina al visor PDF si està informada
@@ -4263,11 +4530,16 @@ function saltarANotaText(text, pageNum = null) {
     }
 
     if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        targetEl.classList.add('vditor-flash-highlight');
+        if (window.innerWidth <= 900 && window.canviarPestanyaMobil) {
+            window.canviarPestanyaMobil('note');
+        }
         setTimeout(() => {
-            targetEl.classList.remove('vditor-flash-highlight');
-        }, 2200);
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetEl.classList.add('vditor-flash-highlight');
+            setTimeout(() => {
+                targetEl.classList.remove('vditor-flash-highlight');
+            }, 2200);
+        }, window.innerWidth <= 900 ? 80 : 0);
         return true;
     }
     return false;
@@ -4278,16 +4550,20 @@ async function renderitzarConnexions(noteData) {
     el.connectionsBody.innerHTML = '';
     let totalConn = 0;
     
-    // 1. PDFs vinculats
+    // 1. PDFs i Snapshots HTML vinculats
     if (noteData.pdfs && noteData.pdfs.length > 0) {
         noteData.pdfs.forEach(p => {
             totalConn++;
+            const fnDoc = p.filename || p.name;
+            const isHtmlDoc = /\.html?$/i.test(fnDoc);
+            const iconCls = isHtmlDoc ? 'fa-globe' : 'fa-file-pdf';
+            const iconCol = isHtmlDoc ? '#0ea5e9' : '#ef4444';
             const pill = document.createElement('a');
             pill.className = 'connection-pill';
-            pill.innerHTML = `<i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> ${escapeHtml(p.filename || p.name)}`;
+            pill.innerHTML = `<i class="fa-solid ${iconCls}" style="color: ${iconCol};"></i> ${escapeHtml(fnDoc)}`;
             pill.onclick = (e) => {
                 e.preventDefault();
-                obrirPdf(p.filename || p.name, false);
+                obrirPdf(fnDoc, false);
             };
             el.connectionsBody.appendChild(pill);
         });
@@ -4410,11 +4686,24 @@ function configurarEvents() {
     }
     if (el.searchAcademicSources) {
         el.searchAcademicSources.addEventListener('change', () => {
-            const isBoe = el.searchAcademicSources.value === 'boe';
+            const val = el.searchAcademicSources.value;
+            const isBoe = val === 'boe' || val === 'legislacio';
+            const isOpendata = val === 'opendata';
+            const isCatastro = val === 'catastro';
+            const isEuroparl = val === 'europarl';
+
             if (el.searchAcademicInput) {
-                el.searchAcademicInput.placeholder = isBoe
-                    ? "Cerca al BOE (ex: llei organica educacio, real decreto 217/2022...)"
-                    : "Cerca acadèmica o DOI...";
+                if (isBoe) {
+                    el.searchAcademicInput.placeholder = "Cerca al BOE (ex: llei educacio, energia solar, real decreto...)";
+                } else if (isOpendata) {
+                    el.searchAcademicInput.placeholder = "Dades obertes (ex: aigua, ipc, transports, subvencions...)";
+                } else if (isCatastro) {
+                    el.searchAcademicInput.placeholder = "Ref. Cadastral (20 caràcters) o Municipi (ex: Ador, Gandia...)";
+                } else if (isEuroparl) {
+                    el.searchAcademicInput.placeholder = "Debats Parlament Europeu (ex: energia, ucraina, fons...)";
+                } else {
+                    el.searchAcademicInput.placeholder = "Cerca acadèmica o DOI...";
+                }
             }
             if (el.searchAcademicEmpty) {
                 if (isBoe) {
@@ -4422,6 +4711,24 @@ function configurarEvents() {
                         <i class="fa-solid fa-scale-balanced" style="font-size: 32px; color: #f59e0b; opacity: 0.8; margin-bottom: 10px;"></i>
                         <p style="margin: 0 0 6px 0; font-weight: 600; color: var(--text-main);">Cerca Legislativa al BOE</p>
                         <p style="font-size: 11px; margin: 0; line-height: 1.4;">Consulta Lleis Orgàniques, Reials Decrets, Ordres Ministerials i decrets oficials publicats al Boletín Oficial del Estado.</p>
+                    `;
+                } else if (isOpendata) {
+                    el.searchAcademicEmpty.innerHTML = `
+                        <i class="fa-solid fa-database" style="font-size: 32px; color: #0284c7; opacity: 0.8; margin-bottom: 10px;"></i>
+                        <p style="margin: 0 0 6px 0; font-weight: 600; color: var(--text-main);">Dades Obertes Públiques (AGE)</p>
+                        <p style="font-size: 11px; margin: 0; line-height: 1.4;">Consulta el Catàleg Nacional datos.gob.es, les sèries de l'INE (IPC, atur, demografia) i convocatòries de la BDNS.</p>
+                    `;
+                } else if (isCatastro) {
+                    el.searchAcademicEmpty.innerHTML = `
+                        <i class="fa-solid fa-house-chimney" style="font-size: 32px; color: #ec4899; opacity: 0.8; margin-bottom: 10px;"></i>
+                        <p style="margin: 0 0 6px 0; font-weight: 600; color: var(--text-main);">Cadastre & Immobiliari</p>
+                        <p style="font-size: 11px; margin: 0; line-height: 1.4;">Introdueix una Referència Cadastral (20 caràcters) per obtindre coordenades GPS i fitxa oficial, o una zona de la Safor per analitzar preus i rendibilitats.</p>
+                    `;
+                } else if (isEuroparl) {
+                    el.searchAcademicEmpty.innerHTML = `
+                        <i class="fa-solid fa-landmark-flag" style="font-size: 32px; color: #3b82f6; opacity: 0.8; margin-bottom: 10px;"></i>
+                        <p style="margin: 0 0 6px 0; font-weight: 600; color: var(--text-main);">Parlament Europeu (Open Data)</p>
+                        <p style="font-size: 11px; margin: 0; line-height: 1.4;">Consulta intervencions, discursos i resolucions oficials dels plens parlamentaris europeus directament des de la font.</p>
                     `;
                 } else {
                     el.searchAcademicEmpty.innerHTML = `
@@ -4916,15 +5223,25 @@ function configurarEvents() {
         btnImportEditor.onclick = importarSubratllatsPdf;
     }
     
-    // Menú Flotant d'Acció Ràpida sobre la Selecció al PDF
+    // Menú Flotant d'Acció Ràpida sobre la Selecció al PDF / Snapshot HTML
     if (el.pdfFrame) {
         el.pdfFrame.addEventListener('load', vincularEventsIframePdf);
+    }
+    const btnFloatHighlight = document.getElementById('pdf-float-highlight');
+    if (btnFloatHighlight) {
+        btnFloatHighlight.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            resaltarSeleccioAlPdf();
+            amagarMenuFlotantPdf();
+        };
     }
     const btnFloatCite = document.getElementById('pdf-float-cite');
     if (btnFloatCite) {
         btnFloatCite.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
+            resaltarSeleccioAlPdf();
             amagarMenuFlotantPdf();
             if (!estatSeleccioPdf.text) return;
             const pag = estatSeleccioPdf.page || 1;
@@ -5111,7 +5428,8 @@ function configurarEvents() {
             e.preventDefault();
             obrirAmbKate();
         }
-        // Alt+A: Pestanya Agent Antigravity
+        // Alt+A: Pestanya Agent Antigravity (Desactivada)
+        /*
         if (e.altKey && (e.key === 'a' || e.key === 'A')) {
             e.preventDefault();
             if (el.panelLibrary.classList.contains('collapsed')) {
@@ -5122,6 +5440,7 @@ function configurarEvents() {
             }
             canviarPestanya('antigravity');
         }
+        */
         // Alt+T: Canviar tema clar/fosc
         if (e.altKey && (e.key === 't' || e.key === 'T')) {
             e.preventDefault();
@@ -5183,7 +5502,9 @@ function configurarEvents() {
     if (el.btnRetryAntigravity) {
         el.btnRetryAntigravity.onclick = () => comprovarEstatAntigravity(true);
     }
-    alternarPestanyaAntigravity(false); // Inicialitza segons preferència de l'usuari (localStorage)
+    if (el.tabAntigravityBtn) {
+        alternarPestanyaAntigravity(false);
+    }
 }
 
 function togglePanellPdf() {
@@ -5495,12 +5816,36 @@ async function executarCercaAcademicaPlec() {
     
     if (el.searchAcademicBanner) el.searchAcademicBanner.style.display = 'none';
     if (el.searchAcademicResults) {
-        if (sources === 'boe') {
+        if (sources === 'boe' || sources === 'legislacio') {
             el.searchAcademicResults.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: var(--text-muted);">
                     <i class="fa-solid fa-scale-balanced fa-spin fa-2x" style="color: #f59e0b; margin-bottom: 12px;"></i>
                     <p style="font-size: 12px; margin: 0; font-weight: 600; color: var(--text-main);">Cercant al Butlletí Oficial de l'Estat (BOE)...</p>
                     <p style="font-size: 11px; margin: 4px 0 0 0; color: var(--text-muted);">Consultant legislació oficial, lleis, reials decrets i disposicions</p>
+                </div>
+            `;
+        } else if (sources === 'opendata') {
+            el.searchAcademicResults.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <i class="fa-solid fa-database fa-spin fa-2x" style="color: #0284c7; margin-bottom: 12px;"></i>
+                    <p style="font-size: 12px; margin: 0; font-weight: 600; color: var(--text-main);">Cercant a Dades Obertes d'Espanya...</p>
+                    <p style="font-size: 11px; margin: 4px 0 0 0; color: var(--text-muted);">Consultant Catàleg datos.gob.es, INE i BDNS Subvencions</p>
+                </div>
+            `;
+        } else if (sources === 'catastro') {
+            el.searchAcademicResults.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <i class="fa-solid fa-house-chimney fa-spin fa-2x" style="color: #db2777; margin-bottom: 12px;"></i>
+                    <p style="font-size: 12px; margin: 0; font-weight: 600; color: var(--text-main);">Consultant Seu Electrònica del Cadastre & Mercat...</p>
+                    <p style="font-size: 11px; margin: 4px 0 0 0; color: var(--text-muted);">Resolució de parcel·les, coordenades GPS WGS84 i preus de la Safor</p>
+                </div>
+            `;
+        } else if (sources === 'europarl') {
+            el.searchAcademicResults.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <i class="fa-solid fa-landmark-flag fa-spin fa-2x" style="color: #2563eb; margin-bottom: 12px;"></i>
+                    <p style="font-size: 12px; margin: 0; font-weight: 600; color: var(--text-main);">Consultant Parlament Europeu (Open Data API)...</p>
+                    <p style="font-size: 11px; margin: 4px 0 0 0; color: var(--text-muted);">Recuperant intervencions, discursos i debats plenaris oficials</p>
                 </div>
             `;
         } else {
@@ -5587,6 +5932,9 @@ async function executarCercaAcademicaPlec() {
             const isLeg = isBoe || isDogv;
             const pmid = (item.extra && item.extra.pmid) || (ident.match(/PMID-?(\d+)/i) ? ident.match(/PMID-?(\d+)/i)[1] : '');
             const isBio = sourcesList.some(s => s.includes("BioMCP") || s.includes("PubMed")) || Boolean(pmid);
+            const isCat = sourcesList.includes("Catastro") || sourcesList.includes("RealEstateSafor") || item.source === "Catastro";
+            const isOpendata = sourcesList.includes("OpenData") || sourcesList.includes("datos.gob.es") || sourcesList.includes("INE") || sourcesList.includes("BDNS");
+            const isEuroparl = sourcesList.includes("Europarl") || item.source === "Europarl";
 
             // Comprovar si ja tenim aquest paper o llei a la biblioteca
             let noteCand = null;
@@ -5610,10 +5958,16 @@ async function executarCercaAcademicaPlec() {
                 return false;
             });
 
-            const cardBorderColor = isDogv ? '#06b6d4' : (isBoe ? '#f59e0b' : (isBio ? '#10b981' : 'var(--accent)'));
-            const legBadge = isDogv
-                ? '<span style="background: rgba(6, 182, 212, 0.15); color: #0891b2; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏛️ DOGV Oficial</span>'
-                : (isBoe ? '<span style="background: rgba(245, 158, 11, 0.15); color: #d97706; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">⚖️ BOE Oficial</span>' : (isBio ? '<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🩺 BioMCP / PubMed</span>' : ''));
+            const cardBorderColor = isCat ? '#db2777' : (isOpendata ? '#0284c7' : (isEuroparl ? '#2563eb' : (isDogv ? '#06b6d4' : (isBoe ? '#f59e0b' : (isBio ? '#10b981' : 'var(--accent)')))));
+            const legBadge = isCat
+                ? '<span style="background: rgba(219, 39, 119, 0.15); color: #db2777; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏠 Cadastre & Immobiliari</span>'
+                : (isOpendata
+                    ? '<span style="background: rgba(2, 132, 199, 0.15); color: #0284c7; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏛️ Dades Obertes</span>'
+                    : (isEuroparl
+                        ? '<span style="background: rgba(37, 99, 235, 0.15); color: #2563eb; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🇪🇺 Parlament Europeu</span>'
+                        : (isDogv
+                            ? '<span style="background: rgba(6, 182, 212, 0.15); color: #0891b2; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏛️ DOGV Oficial</span>'
+                            : (isBoe ? '<span style="background: rgba(245, 158, 11, 0.15); color: #d97706; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">⚖️ BOE Oficial</span>' : (isBio ? '<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🩺 BioMCP / PubMed</span>' : '')))));
             const rangoBadge = (isLeg && item.journal)
                 ? `<span style="background: ${isDogv ? 'rgba(6, 182, 212, 0.1)' : 'rgba(245, 158, 11, 0.1)'}; color: ${isDogv ? '#0e7490' : '#b45309'}; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">📜 ${escapeHtml(item.journal)}</span>`
                 : (isBio && item.journal ? `<span style="background: rgba(16, 185, 129, 0.1); color: #059669; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🔬 ${escapeHtml(item.journal)}</span>` : '');
@@ -5621,9 +5975,9 @@ async function executarCercaAcademicaPlec() {
                 ? `<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">${isLeg ? '📄 PDF Oficial' : '🔓 Accés Obert'}</span>`
                 : '';
 
-            const btnBg = isDogv ? 'background: #0891b2; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isBoe ? 'background: #f59e0b; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isBio ? 'background: #10b981; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : ''));
-            const btnIcon = isDogv ? 'fa-landmark' : (isBoe ? 'fa-scale-balanced' : (isBio ? 'fa-stethoscope' : 'fa-download'));
-            const btnLabel = isDogv ? 'Importar Norma DOGV' : (isBoe ? 'Importar Norma BOE' : (isBio ? 'Importar Article Mèdic' : 'Importar a Biblioteca'));
+            const btnBg = isCat ? 'background: #db2777; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isOpendata ? 'background: #0284c7; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isEuroparl ? 'background: #2563eb; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isDogv ? 'background: #0891b2; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isBoe ? 'background: #f59e0b; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : (isBio ? 'background: #10b981; color: #fff; border: none; border-radius: 4px; font-weight: 600;' : '')))));
+            const btnIcon = isCat ? 'fa-house-chimney' : (isOpendata ? (isOa ? 'fa-download' : 'fa-database') : (isEuroparl ? 'fa-landmark-flag' : (isDogv ? 'fa-landmark' : (isBoe ? 'fa-scale-balanced' : (isBio ? 'fa-stethoscope' : 'fa-download')))));
+            const btnLabel = isCat ? 'Crear Nota Cadastre' : (isOpendata ? (isOa ? 'Importar Document' : 'Crear Nota Dades') : (isEuroparl ? 'Crear Nota Debat' : (isDogv ? 'Importar Norma DOGV' : (isBoe ? 'Importar Norma BOE' : (isBio ? 'Importar Article Mèdic' : 'Importar a Biblioteca')))));
             const directPdfToPass = item.pdf_url || item.oa_url || '';
 
             return `
@@ -6197,9 +6551,11 @@ function processarParametresUrl() {
     const params = new URLSearchParams(window.location.search);
     const pdf = params.get('pdf');
     const doc = params.get('doc') || params.get('note');
+    const pag = params.get('page') || params.get('p');
+    const cerca = params.get('search') || params.get('q');
     
     if (pdf) {
-        obrirPdf(pdf, !doc);
+        obrirPdf(pdf, !doc, pag ? parseInt(pag, 10) : 1, cerca || null);
     }
     if (doc) {
         obrirNota(doc.endsWith('.md') || doc.endsWith('.org') ? doc : doc + '.md', !pdf);
@@ -6234,9 +6590,10 @@ window.addEventListener('popstate', (e) => {
 let antigravityInitialCheckDone = false;
 
 function alternarPestanyaAntigravity(manualToggle = false) {
+    if (!el.tabAntigravityBtn) return;
     let show = localStorage.getItem('faristol_show_antigravity_tab');
     if (show === null) {
-        show = '1'; // Per defecte visible ja que és una funcionalitat requerida
+        show = '0'; // Per defecte desactivat
     }
     
     if (manualToggle) {
@@ -6267,25 +6624,32 @@ async function comprovarEstatAntigravity(force = false) {
     
     el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #f59e0b;"></i> <span>Verificant...</span>';
     
+    const targetHost = window.location.hostname || 'localhost';
+    const agyUrl = `http://${targetHost}:8000/`;
+
+    const openLink = document.getElementById('btn-open-antigravity-tab');
+    if (openLink) {
+        openLink.href = agyUrl;
+    }
+
     try {
-        await fetch('http://localhost:8000/', { mode: 'no-cors', cache: 'no-store' });
-        // Si no llança error de connexió, el servidor respon a localhost:8000
+        await fetch(agyUrl, { mode: 'no-cors', cache: 'no-store' });
         el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #10b981;"></i> <span style="color: #10b981;">En línia</span>';
         if (el.antigravityOfflineAlert) el.antigravityOfflineAlert.style.display = 'none';
         if (el.antigravityFrameContainer) el.antigravityFrameContainer.style.display = 'block';
 
         if (el.antigravityFrame) {
             const currentSrc = el.antigravityFrame.getAttribute('src');
-            if (force || !currentSrc || currentSrc === 'about:blank') {
+            if (force || !currentSrc || currentSrc === 'about:blank' || !currentSrc.includes(targetHost)) {
                 el.antigravityFrame.onload = () => notificarTemaAntigravity();
-                el.antigravityFrame.src = 'http://localhost:8000';
+                el.antigravityFrame.src = agyUrl;
             } else {
                 notificarTemaAntigravity();
             }
         }
         antigravityInitialCheckDone = true;
     } catch (err) {
-        console.warn("Antigravity server no detectat a localhost:8000:", err);
+        console.warn(`Antigravity server no detectat a ${agyUrl}:`, err);
         el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #ef4444;"></i> <span style="color: #ef4444;">Desconnectat</span>';
         if (el.antigravityOfflineAlert) el.antigravityOfflineAlert.style.display = 'flex';
         if (el.antigravityFrameContainer) el.antigravityFrameContainer.style.display = 'none';

@@ -58,26 +58,26 @@ def netejar_text_slug(text: str) -> str:
 
 def detectar_tots_els_pdfs(fichero_nota: Path, text: str) -> List[Tuple[int, Path, str]]:
     """
-    Detecta tots els PDFs extraient el text descriptiu de l'enllaç si existeix.
+    Detecta tots els PDFs i Snapshots HTML extraient el text descriptiu de l'enllaç si existeix.
     Retorna: [(posicio_inici, ruta_absoluta, nom_o_titol_descriptiu), ...]
     """
     patrons = [
-        # 1. Markdown amb etiqueta descriptiva: [Títol descriptiu](file:///ruta.pdf)
-        (r'\[([^\]\n\r]+)\]\(([^)\n\r]+?[.]pdf)\)', True),
-        # 2. Org-mode amb descripció: [[ruta.pdf][Títol descriptiu]]
-        (r'\[\[([^\]\n\r]+?[.]pdf)\]\[(.*?)\]\]', False),
-        # 3. Org-mode simple: [[ruta.pdf]]
-        (r'\[\[([^\]\n\r]+?[.]pdf)\]\]', None),
+        # 1. Markdown amb etiqueta descriptiva: [Títol descriptiu](file:///ruta.pdf|.html)
+        (r'\[([^\]\n\r]+)\]\(([^)\n\r]+?[.](?:pdf|html))\)', True),
+        # 2. Org-mode amb descripció: [[ruta.pdf|.html][Títol descriptiu]]
+        (r'\[\[([^\]\n\r]+?[.](?:pdf|html))\]\[(.*?)\]\]', False),
+        # 3. Org-mode simple: [[ruta.pdf|.html]]
+        (r'\[\[([^\]\n\r]+?[.](?:pdf|html))\]\]', None),
         # 4. Propietat Org-noter
-        (r':NOTER_DOCUMENT:\s*["\']?([^"\n\r]+?[.]pdf)["\']?', None),
+        (r':NOTER_DOCUMENT:\s*["\']?([^"\n\r]+?[.](?:pdf|html))["\']?', None),
         # 5. Ruta directa solta
-        (r'(?:file://)?(/[^\n\r"\'<>]+?[.]pdf)', None),
+        (r'(?:file://)?(/[^\n\r"\'<>]+?[.](?:pdf|html))', None),
     ]
     
     trobats = []
     rutes_vistes = set()
 
-    # 0. Resolució 1:1 canònica per a notes bibliogràfiques (@citekey.md <-> citekey.pdf)
+    # 0. Resolució 1:1 canònica per a notes bibliogràfiques (@citekey.md <-> citekey.html / citekey.pdf)
     if fichero_nota:
         stem = ""
         if fichero_nota.name.startswith("@"):
@@ -89,10 +89,11 @@ def detectar_tots_els_pdfs(fichero_nota: Path, text: str) -> List[Tuple[int, Pat
         
         if stem:
             from .config import FONTS_DIR
-            pdf_canonic = FONTS_DIR / f"{stem}.pdf"
-            if pdf_canonic.is_file() and str(pdf_canonic.resolve()) not in rutes_vistes:
-                rutes_vistes.add(str(pdf_canonic.resolve()))
-                trobats.append((0, pdf_canonic.resolve(), pdf_canonic.name))
+            for ext in [".html", ".pdf"]:
+                doc_canonic = FONTS_DIR / f"{stem}{ext}"
+                if doc_canonic.is_file() and str(doc_canonic.resolve()) not in rutes_vistes:
+                    rutes_vistes.add(str(doc_canonic.resolve()))
+                    trobats.append((0, doc_canonic.resolve(), doc_canonic.name))
 
     for pat, tipus in patrons:
         for m in re.finditer(pat, text, re.IGNORECASE):
@@ -119,7 +120,7 @@ def detectar_tots_els_pdfs(fichero_nota: Path, text: str) -> List[Tuple[int, Pat
             if not p.is_absolute() and fichero_nota:
                 p = (fichero_nota.parent / p).resolve()
             
-            if p.exists() and p.is_file() and p.suffix.lower() == ".pdf":
+            if p.exists() and p.is_file() and p.suffix.lower() in [".pdf", ".html"]:
                 if str(p) not in rutes_vistes:
                     rutes_vistes.add(str(p))
                     nom_mostrar = etiqueta if etiqueta else p.name
@@ -340,21 +341,22 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", abstract
     return False
 
 def obtenir_pdfs_associats_nota(nota_filename: str) -> List[str]:
-    """Retorna la llista de noms de fitxers PDF existents associats a una nota Markdown."""
+    """Retorna la llista de noms de fitxers PDF o HTML existents associats a una nota Markdown."""
     from .config import FONTS_DIR, NOTAS_DIR
     
     n_path = NOTAS_DIR / nota_filename
     res = []
     rutes_vistes = set()
     
-    # 1. Comprovació canònica directa (@citekey.md -> citekey.pdf)
+    # 1. Comprovació canònica directa (@citekey.md -> citekey.html / citekey.pdf)
     stem = Path(nota_filename).stem
     if stem.startswith("@"):
         stem = stem[1:]
-    cand_pdf = FONTS_DIR / f"{stem}.pdf"
-    if cand_pdf.is_file():
-        res.append(cand_pdf.name)
-        rutes_vistes.add(cand_pdf.name)
+    for ext in [".html", ".pdf"]:
+        cand_doc = FONTS_DIR / f"{stem}{ext}"
+        if cand_doc.is_file():
+            res.append(cand_doc.name)
+            rutes_vistes.add(cand_doc.name)
         
     # 2. Anàlisi del contingut de la nota si existeix
     if n_path.is_file():

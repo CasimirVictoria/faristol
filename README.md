@@ -1,6 +1,6 @@
 # 📖 Faristol
 
-> **Banc de treball lliure per a la lectura de PDFs, anotació i síntesi bibliogràfica.**  
+> **Banc de treball sobirà per a la lectura de PDFs, anotació i síntesi bibliogràfica.**  
 > *Inspirat en Org-Noter, Denote, Zotero, Better BibTeX, Better Notes i ZotMoov.*  
 > *Zero bases de dades opaques, 100% fitxers plans (Markdown + BibTeX + PDFs).*
 
@@ -12,19 +12,37 @@
 
 El nom prové del mot genuí **faristol** (*el moble o suport inclinat on es col·loca el llibre obert per poder llegir còmodament i prendre notes alhora sense haver d'aguantar-lo amb les mans*): el nostre faristol digital sosté el document PDF davant dels teus ulls mentre prens notes i reflexiones lliurement en el teu quadern de recerca.
 
-Faristol presenta una interfície web moderna de **tres plafons sincronitzats**:
+Faristol presenta una interfície web moderna de **maquetació en mosaic (tiling) amb zero marges grisos i tres plafons sincronitzats**:
 
-1. **Plafó lateral de navegació i cerca:** Carpetes i col·leccions virtuals, explorador de notes, explorador de PDFs de la biblioteca, xat d'IA integrat amb NotebookLM i cerca acadèmica federada en 35 bases de dades i repositoris.
-2. **Visor de PDF central (PDF.js personalitzat):** Renderitzat fluid, subratllat persistent, cerca exacta multilínia, navegació per pàgines i extracció automàtica d'anotacions.
+```
+┌─────────────────┬───────────────────────────────┬───────────────────────────────┐
+│  BARRA SUPERIOR │  📁 Filosofia  📁 Didàctica   📁 IA Educativa  [Totes]        │
+├─────────────────┼───────────────────────────────┼───────────────────────────────┤
+│ PLAFÓ LATERAL   │       PLAFÓ CENTRAL           │         PLAFÓ DRET            │
+│                 │                               │                               │
+│ [📚 Biblioteca] │   Visor PDF.js personalitzat  │   Editor Markdown (Vditor)    │
+│ [🤖 IA (agy)]   │   - Subratllat persistent     │   - Metadades Denote (YAML)   │
+│ [🎙️ NotebookLM]│   - Cerca exacta multilínia   │   - Renderitzat KaTeX ($E=mc²)│
+│ [🌐 Cerca (35)] │   - Extracció d'anotacions    │   - Cites Pandoc [@citekey]   │
+│                 │   - Salts des de la nota      │   - Backlinks i xarxa         │
+│                 │                               │                               │
+│                 │   ⇄ Intercanvi F7: Editor al centre / PDF a la dreta          │
+└─────────────────┴───────────────────────────────┴───────────────────────────────┘
+```
+
+1. **Plafó lateral de navegació unificada:**
+   - **📚 Biblioteca:** Gestió de col·leccions jeràrquiques, explorador de notes i PDFs unificats 1-a-1, cercador instantani.
+   - **🤖 IA (Antigravity agy-bridge):** Copilot d'enginyeria i investigació en viu incrustat (port 8000), sincronitzat en tema clar/fosc, amb KaTeX LaTeX, execució de codi i visor de terminal.
+   - **🎙️ NotebookLM:** Estudi de recerca i generació d'àudio (RAG) amb exportació directa de respostes a Markdown pur amb cites a pàgina exacta.
+   - **🌐 Cerca Acadèmica (35 motors):** Cerca federada en paral·lel mitjançant `mcp-server-academic-spain` i descàrrega en 1 clic amb `add-paper`.
+2. **Visor de PDF central (PDF.js personalitzat):** Renderitzat fluid, subratllat persistent, cerca exacta multilínia que creua salts de paràgraf, navegació per pàgines i extracció automàtica de cites textuals.
 3. **Editor de notes (Vditor Markdown):** Editor WYSIWYG/Markdown amb suport complet per a KaTeX (fórmules matemàtiques), etiquetes `#tags`, retroenllaços bidireccionals (*backlinks/outlinks*), citacions Pandoc `[@citekey, p. X]` i salts instantanis a la pàgina exacta del PDF.
 
 ---
 
 ## 💡 Inspiracions i Llinatge
 
-Faristol no neix del no-res; intenta sintetitzar les millors idees del programari lliure acadèmic dels darrers anys en una arquitectura moderna basada en la web i en fitxers plans. 
-
-Si bé és una eina molt més senzilla, directa i sense tanta capacitat o feixuguesa de configuració com tenen totes les eines en què ens basem, hem construït i agafat de cadascuna allò que realment necessitem per a la nostra manera de treballar, llegir i organitzar-nos:
+Faristol sintetitza les millors idees del programari lliure acadèmic dels darrers anys en una arquitectura moderna basada en la web i en fitxers plans:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -39,31 +57,25 @@ Si bé és una eina molt més senzilla, directa i sense tanta capacitat o feixug
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Org-Noter (Emacs):**  
-   El paquet llegendari d'Emacs que va inventar la lectura sincronitzada entre un document (PDF/EPUB) i un document de notes, permetent saltar entre el text de la nota i la ubicació exacta del PDF. Faristol modernitza aquesta experiència per a la web amb Markdown estàndard, citacions Pandoc (`[@citekey, p. 12]`) i concordança exacta de text multilínia.
-2. **Denote (Emacs - Protesilaos Stavrou):**  
-   La filosofia de presa de notes basada estrictament en fitxers de text pla, convencions de nomenclatura senzilles i predictibles, metadades YAML transparents i enllaços/retroenllaços (*backlinks*) directes. Com a Denote, Faristol rebutja qualsevol base de dades monolítica, dependència opaca o sincronització privativa: el sistema de fitxers és la teua base de dades, i les teues notes sobreviuran a qualsevol programari.
-3. **Zotero & Zotero Connector:**  
-   Aprofitem el connector oficial de Zotero per a Firefox i Chrome gràcies a l'emulació de [zoterless](https://github.com/CasimirVictoria/zoterless), que respon al port local `23119` sense necessitat de tindre Zotero Desktop obert.
-4. **Better BibTeX (BBT):**  
-   Totes les publicacions tenen una clau de citació canònica i unívoca, i el fitxer `biblioteca.bib` és la font de veritat bibliogràfica del sistema.
-5. **Better Notes:**  
-   Cada document té la seua pròpia nota associada en Markdown (`@{citekey}.md`) amb metadades YAML (títol, autors, data, tags, enllaç al PDF) i espai per a resums, cites literals i reflexions personals.
-6. **ZotMoov / ZotFile:**  
-   Els PDFs no queden atrapats en directoris críptics ni en registres SQLite: es desen amb el seu nom canònic `{citekey}.pdf` a la carpeta oberta `~/Documents/Biblioteca/pdfs/`.
+1. **Org-Noter (Emacs):** La lectura sincronitzada entre un document (PDF) i un document de notes, permetent saltar entre el text de la nota i la ubicació exacta del PDF amb un sol clic.
+2. **Denote (Emacs - Protesilaos Stavrou):** La filosofia de presa de notes basada estrictament en fitxers de text pla, convencions de nomenclatura senzilles (`@{citekey}.md`), metadades YAML transparents i enllaços/retroenllaços (*backlinks*) directes. Zero bases de dades monolítiques.
+3. **Zotero & Zotero Connector:** Ingesta en un sol clic al navegador emulada pel dimoni ultralleuger [zoterless](https://github.com/CasimirVictoria/zoterless) (0 MB RAM en repòs).
+4. **Better BibTeX (BBT):** Claus de citació canòniques i predictibles (`autorTitolAny`) i sincronització permanent amb `biblioteca.bib`.
+5. **Better Notes:** Cada document té la seua pròpia nota associada en Markdown (`@{citekey}.md`) amb metadades YAML, resum oficial, cites literals i reflexions personals.
+6. **ZotMoov / ZotFile:** Els PDFs es desen amb el seu nom canònic `{citekey}.pdf` a la carpeta oberta `~/Documents/Biblioteca/pdfs/`.
 
 ---
 
-## 🏛️ L'Ecosistema: Faristol + zoterless + academic-spain
+## 🏛️ L'Ecosistema: Faristol + zoterless + add-paper + academic-spain
 
-Faristol és la cara visual d'un ecosistema modular basat en la filosofia UNIX (*cada eina fa una cosa i la fa bé*):
+Faristol és la interfície de treball visual d'un ecosistema modular basat en la filosofia UNIX (*cada eina fa una cosa i la fa a la perfecció*):
 
 ```mermaid
 flowchart TD
-    subgraph Fonts ["1. INGESTA & CERCA"]
-        Web["Navegador (Firefox)"] -->|Zotero Connector| ZL["zoterless (Port 23119)"]
-        CLI["add-paper (CLI)"] --> ZL
-        AS["mcp-server-academic-spain (18 motors)"] -->|Resultats OA| FaristolApp
+    subgraph Ingesta ["1. INGESTA & CERCA"]
+        Firefox["Firefox / Falkon (Zotero Connector)"] --> ZL["zoterless (Port 23119, 0MB RAM)"]
+        CLI["add-paper (CLI multilingüe)"] --> ZL
+        AS["mcp-server-academic-spain (35 motors)"] -->|Resultats OA| FaristolApp
     end
 
     subgraph Storage ["2. FONT DE VERITAT (Text Pla)"]
@@ -73,14 +85,15 @@ flowchart TD
         Colls["~/.config/faristol/collections.json"]
     end
 
-    subgraph FaristolApp ["3. FARISTOL WORKBENCH (FastAPI + Web)"]
-        Sidebar["Plafó Lateral (Col·leccions, Notes, PDFs, Cerca, NotebookLM)"]
+    subgraph FaristolApp ["3. FARISTOL WORKBENCH"]
+        Sidebar["Plafó Lateral (Biblioteca, Antigravity IA, NotebookLM, Cerca 35)"]
+        TopBar["Barra Superior Permanent de Carpetes"]
         Viewer["Plafó Central (PDF.js + Exact Text Search)"]
-        Editor["Plafó Dret (Vditor Markdown + Cites Pandoc)"]
+        Editor["Plafó Dret (Vditor Markdown + KaTeX + Pandoc)"]
     end
 
     ZL -->|Escriu referència| Bib
-    ZL -->|Descarrega PDF| PDFs
+    ZL -->|Descarrega PDF / XeLaTeX| PDFs
     ZL -->|Genera nota| Notes
 
     Bib <--> FaristolApp
@@ -91,66 +104,74 @@ flowchart TD
 
 ### Divisió de responsabilitats
 
-- **`zoterless`:** El dimoni de captura en segon pla. Rep les crides del Zotero Connector, cerca el PDF en accés obert (Unpaywall multi-ubicació, OpenAlex, repositoris OJS/DSpace), genera la citekey, actualitza `biblioteca.bib` i crea la nota `@citekey.md`.
-- **`mcp-server-academic-spain`:** El motor de cerca acadèmica federada. Realitza consultes en paral·lel a 35 plataformes i repositoris (Dialnet, OpenAlex, ERIC, CSIC, arXiv, PubMed, SciELO, DOAJ, DBLP, Recolecta, TDR, etc.) amb suport per a EduVPN.
-- **`Faristol`:** El banc de treball unificat on llegeixes el PDF, prens notes al costat, consultes la IA de Google NotebookLM sobre els teus documents i gestiones les teues col·leccions virtuals.
-
-### 🔄 El Cicle Virtuós de Millora Compartida (Font Única)
-
-Faristol aprofita la intel·ligència centralitzada de `mcp-server-academic-spain`:
-
-- Quan es descobreix un nou repositori o es corregeix un repte antibot d'una editorial científica (com el cas d'Springer o la resolució exacta per DOI a OpenAlex), **Faristol obté la millora automàticament**.
-- El mateix codi que empren els agents d'IA (Antigravity/Claude) i la consola (`add-paper`) és el que alimenta la pestanya de cerca de Faristol: una millora al motor beneficia simultàniament la IA, el terminal i el teu banc de lectura.
+- **`zoterless`:** El dimoni de captura en segon pla (activat per socket a demanda, 0 MB de RAM en repòs). Rep crides del Zotero Connector, descarrega el PDF en accés obert legal, maqueta articles web a XeLaTeX, actualitza `biblioteca.bib` i crea la nota `@citekey.md`.
+- **`add-paper`:** El gestor de línia d'ordres i d'escriptori per incorporar articles per DOI, arXiv, Dialnet o cerca federada interactiva en 35 bases de dades amb traducció local Argos.
+- **`Faristol`:** El banc de treball integral on llegeixes el PDF, prens notes al costat, interactues amb la IA d'Antigravity o NotebookLM i organitzes les teues col·leccions temàtiques.
 
 ---
 
 ## ✨ Característiques Principals
 
-### 1. Lectura i Escriptura a dos plafons (Org-Noter + Denote)
+### 1. Maquetació en Mosaic (Tiling) sense Marges Grisos
+- Aprofita el 100% de la resolució del teu monitor amb panells acoblats i redimensionables.
+- **Barra de carpetes superior permanent:** Permet filtrar la biblioteca per col·leccions o temes amb un sol clic sense perdre l'espai de lectura.
 
-- Obre simultàniament el document PDF i la seua nota d'estudi.
-- **Intercanvi dinàmic de panells (F7 / Alt+W):** prem `F7` o el botó `⇄` per situar l'editor Markdown al centre quan estigues redactant de forma intensiva, deixant el PDF a la dreta com a panell lateral de consulta.
-- Fes clic a qualsevol citació tipus `[@citekey, p. 15]` o referència de pàgina a la nota per **saltar automàticament a la pàgina exacta del PDF**.
-- Subratlla text al PDF i copia'l com a cita textual formatejada directament a la nota amb un sol clic.
+### 2. Intercanvi Dinàmic de Panells (`F7` / `Alt + W`)
+- **Mode Lectura (per defecte):** PDF al centre per a una lectura reposada i editor de notes a la dreta per anotar idees.
+- **Mode Redacció intensiva:** Prem `F7` o el botó `⇄` per situar l'editor Markdown al centre en gran format, deixant el PDF a la dreta com a panell lateral de consulta.
 
-### 2. Visor PDF.js d'alta precisió
+### 3. Panell d'Intel·ligència Artificial Integrat (Antigravity `agy-bridge`)
+- Accés immediat al teu agent d'IA sobirà des de la pestanya **[ 🤖 IA ]**.
+- Integració directa amb `agy-bridge` (port 8000).
+- Suport per a consultes de programació, resolució de càlculs, anàlisi de dades, execució de terminals remotes i renderitzat KaTeX LaTeX.
+- **Sincronització de Tema Clar / Fosc:** El canvi de tema a Faristol (`Alt + T`) es propaga automàticament a la interfície de la IA.
 
-- Cerca de text multilínia millorada: troba frases que creuen salts de línia o guionets de paraula.
-- Subratllats persistents desats a disc (`~/.config/faristol/highlights.json`).
-- Extracció d'anotacions natives i subratllats existents amb PyMuPDF (`fitz`).
+### 4. Xat de Recerca amb Google NotebookLM (RAG sobre Documents)
+Faristol integra directament l'estudi de recerca i generació d'àudio de **Google NotebookLM** mitjançant el client `nlm` a la pestanya lateral **[ 🎙️ NotebookLM ]**:
 
-### 3. Editor Markdown ric (Vditor)
+- **Quaderns temàtics per col·lecció:** Connecta les teues carpetes d'estudi amb els seus quaderns corresponents de NotebookLM (ex: *Creativitat*, *Pensament Computacional*, *Filosofia*).
+- **Selecció granular de fonts (*checkboxes*):** Permet activar o desactivar articles concrets (`Fonts (X/Y)`) per limitar la consulta als documents que t'interessen o preguntar transversalment sobre la totalitat del quadern.
+- **Botó d'ingesta ràpida («📥 Ingerir PDF»):** A la barra superior del visor central, amb un sol clic pots enviar qualsevol PDF que estigues llegint directament a NotebookLM per afegir-lo com a font d'estudi.
+- **Xat en temps real fonamentat en les teues fonts:** Fes preguntes complexes, demana contrastos entre autors, metodologies emprades o síntesis comparatives. Totes les respostes es generen estrictament amb el contingut dels teus documents.
+- **Citacions numèriques interactives amb salt al PDF:** Cada afirmació de NotebookLM inclou citacions de font; en fer clic sobre qualsevol cita, **Faristol obre automàticament el PDF corresponent al visor central i salta a la pàgina exacta** ressaltant el text d'evidència.
+- **Injecció a la nota i síntesi transversal:** Pots injectar la resposta de la IA directament a la teua nota oberta o exportar la conversa sencera a Markdown pur. Això crea automàticament retroenllaços bidireccionals que apareixen a la secció inferior **«Connexions de la nota»** vinculant la literatura analitzada.
 
+### 5. Cerca Acadèmica Federada en 35 Motors
+- Pestanya **[ 🌐 Cerca ]** connectada a `mcp-server-academic-spain`.
+- Consulta en paral·lel a repositoris nacionals i internacionals: Dialnet, OpenAlex, CSIC, arXiv, PubMed, ERIC, SciELO, DOAJ, DBLP, Recolecta, TDX, etc.
+- **Importació en 1 clic:** descàrrega en accés obert, registre BibTeX i creació de nota instantània mitjançant `add-paper`.
+
+### 6. Visor Dual de Documents: PDFs i Snapshots HTML Autèntics
+Faristol no es limita als documents PDF: és un visor universal tant per a documents PDF com per a **captures web completes en format HTML (SingleFile)**:
+- **Lectura d'Snapshots HTML autèntics:** Carrega directament pàgines web arxivades conservant la tipografia, imatges, gràfics interactius i maquetació original del web.
+- **Subratllat interactiu persistent:** Funciona exactament igual en PDFs que en HTML; selecciona qualsevol text al document HTML i fes clic a **«Subratllar»** (el text queda destacat amb `mark.faristol-highlight` i es manté guardat).
+- **Extracció de cites directes:** En seleccionar text en un PDF o en un Snapshot HTML, el menú flotant permet prémer **«Citar»** per injectar automàticament la cita textual a l'editor de notes Markdown de la dreta.
+- **Sincronització bidireccional:** En fer clic a una citació o fragment de text a la nota, Faristol realitza un desplaçament (*scroll*) suau i automàtic al panell central fins al paràgraf exacte, tant si és un PDF com un arxiu HTML.
+- **Cerca multilínia d'alta precisió:** Troba termes i oracions que creuen salts de paràgraf o guionets de tall.
+
+### 7. Editor Markdown Ric (Vditor)
 - Format en temps real, mode pantalla dividida o mode codi font pur.
 - Renderitzat matemàtic complet amb KaTeX (`$E = mc^2$`).
-- Suport per a etiquetes YAML (`tags: [lectura, ia, didactica]`) i `#etiquetes` al text.
-- Gràfic de retroenllaços (*backlinks*) i enllaços sortints (*outlinks*) per a navegació en xarxa tipus Zettelkasten / Obsidian.
+- Metadades Denote YAML netes (`title`, `authors`, `year`, `citekey`, `tags`).
+- Gràfic de retroenllaços (*backlinks*) per a navegació tipus Zettelkasten.
 
-### 4. Cerca Acadèmica Federada Integrada
-
-- Pestanya **[ 🌐 Cerca ]** al plafó lateral.
-- Cerca instantània a través de 35 cercadors acadèmics i repositoris.
-- Traducció automàtica local de consultes (català ↔ anglès / castellà) mitjançant Argos Translate.
-- **Importació en 1 clic:** descarrega el PDF en accés obert, l'incorpora a la biblioteca i crea la nota Markdown automàticament.
-
-### 5. Xat d'IA amb Google NotebookLM (RAG)
-
-- Connecta les teues col·leccions de documents directament amb NotebookLM mitjançant el CLI oficial `nlm`.
-- Fes preguntes complexes sobre el conjunt de documents de la col·lecció.
-- Les respostes inclouen citacions amb enllaços directes que obren el PDF corresponent a la pàgina de la font.
-- Injecta la síntesi de la IA directament a la teua nota amb el botó "Injectar a la nota" o exporta en Markdown pur amb cites acadèmiques.
-
-### 6. Col·leccions Virtuals
-
-- Organitza la teua biblioteca en carpetes temàtiques i subcarpetes jeràrquiques sense moure els fitxers de disc.
-- Assigna notes i PDFs a múltiples col·leccions alhora.
-- Sincronització directa de la col·lecció amb un quadern de NotebookLM.
+### 8. Ubiquitat Mòbil i Accés Remot (via Tailscale)
+- **Accés des de qualsevol lloc:** Gràcies a la xarxa privada xifrada de **Tailscale**, pots accedir a Faristol (`http://<IP-Tailscale>:8080`) des del telèfon mòbil, tauleta o portàtil estigues on estigues (amb dades 4G/5G, a la universitat o fora de casa), sense exposar cap port a Internet pública.
+- **Captura d'Articles Web amb SingleFile des d'Android:**
+  - Configurant l'extensió **SingleFile** a Firefox Android (Destinació ➔ *Upload to a REST Form API* ➔ `http://<IP-Tailscale>:23119/singlefile`), en prémer la icona de SingleFile al telèfon es capturen automàticament **dues versions alhora**:
+    1. L'**arxiu HTML autèntic** (`{citekey}.html`), llest per ser visualitzat, subratllat i citat a Faristol amb el seu disseny original.
+    2. La **versió PDF XeLaTeX** (`{citekey}.pdf`), optimitzada per a impressió o lectors de tinta electrònica.
+    3. La **fitxa Markdown** (`@{citekey}.md`), sincronitzada amb les metadades i el text net de l'article.
+- **Flux complet de recerca mòbil:**
+  1. **Captura en 1 clic des del mòbil:** Quan trobes un article, llibre o PDF al telèfon, l'envies a la biblioteca mitjançant el menú natiu *«Compartir»* d'Android (gràcies a la integració PWA Web Share Target de `zoterless` a `:23119`) o amb SingleFile.
+  2. **Lectura immediata a Faristol:** En obrir Faristol al mòbil o a l'ordinador, el document (PDF o HTML) ja apareix a la biblioteca, llest per llegir, anotar i subratllar.
+  3. **Copilot IA autònom (Hermit / PWA):** Al mòbil, la IA funciona com a Lite App autònoma a pantalla completa amb Hermit (connectada a `agy-bridge` a `:8000`), permetent una multitasca fluida mitjançant gestos entre la lectura a Faristol i les consultes a l'assistent.
 
 ---
 
 ## 📁 Estructura de Fitxers Canònica
 
-Faristol opera exclusivament sobre la teua estructura de documents estàndard:
+Faristol opera exclusivament sobre la teua estructura estàndard de fitxers plans:
 
 ```text
 ~/Documents/
@@ -175,18 +196,25 @@ Configuració i metadades auxiliars:
 
 ### 🏷️ La Convenció de l'Arroba (`@`): Notes Bibliogràfiques vs. Notes Pròpies
 
-Al directori `~/Documents/notes/`, Faristol i el seu ecosistema distingeixen de forma fonamental dues tipologies de notes mitjançant el prefix del fitxer:
-
 | Tipus de Nota | Nomenclatura del fitxer | Descripció i Propòsit | Exemple |
 | :--- | :--- | :--- | :--- |
-| **Nota Bibliogràfica** *(Literature Note)* | **`@{citekey}.md`** *(sempre amb arroba inicial)* | Fitxa d'estudi vinculada directament a una font externa, document o article científic. Conté les metadades YAML (`citekey`, `pdf`), resums de l'obra, cites textuals i reflexions sobre la lectura. | `@berzosaPensamentComputacional2024.md` |
-| **Nota Pròpia / Permanent** *(Evergreen / Atomic Note)* | **`{timestamp}--{slug}_{tags}.md`** o **`{slug}.md`** *(sense arroba)* | Nota de pensament propi elaborada totalment per nosaltres. Desenvolupa un concepte, tesi, hipòtesi o argument personal (seguint Denote o Zettelkasten). Enllaça cap a les fonts usant `[[@citekey]]` o cites Pandoc `[@citekey, p. 12]`. | `20260920T120000--didactica-de-la-fisica_ciencies.md` |
+| **Nota Bibliogràfica** *(Literature Note)* | **`@{citekey}.md`** *(amb arroba inicial)* | Fitxa vinculada directament a una font externa. Conté les metadades YAML (`citekey`, `pdf`), resums, cites textuals i reflexions sobre la lectura. | `@berzosaPensamentComputacional2024.md` |
+| **Nota Pròpia / Permanent** *(Evergreen / Atomic Note)* | **`{timestamp}--{slug}_{tags}.md`** o **`{slug}.md`** *(sense arroba)* | Nota de pensament propi elaborada per nosaltres. Desenvolupa un argument personal (seguint Denote/Zettelkasten). Enllaça a fonts amb `[[@citekey]]` o `[@citekey, p. 12]`. | `20260920T120000--didactica-de-la-fisica_ciencies.md` |
 
-> **Per què aquesta distinció és crucial?**  
+---
 
-> 1. **Diferenciació visual i conceptual immediata:** Amb un cop d'ull a la carpeta de notes o a l'arbre lateral de Faristol, saps a l'instant si estàs llegint la síntesi d'un autor extern (`@...`) o una idea original teua.
-> 2. **Vinculació automàtica 1:1:** Faristol i `zoterless` aprofiten el patró `@{citekey}.md` per obrir automàticament el PDF corresponent `{citekey}.pdf` al visor central i resoldre les metadades de `biblioteca.bib`.
-> 3. **Claredat epistèmica en la investigació:** Evita la confusió freqüent en el treball acadèmic entre el que diu la literatura científica i el que constitueix la teua pròpia aportació o anàlisi.
+## ⌨️ Dreceres de Teclat a Faristol
+
+| Drecera | Acció |
+| :--- | :--- |
+| `F7` o `Alt + W` | **Intercanvia els panells:** col·loca l'Editor al centre o torna el PDF al centre |
+| `Alt + T` | **Alterna el tema:** Clar (per defecte) / Fosc (amb sincronització a panells IA) |
+| `Alt + 1` | Activa el Plafó Lateral |
+| `Alt + 2` | Activa el Visor de PDF |
+| `Alt + 3` | Activa l'Editor de Notes |
+| `Ctrl + S` | Desa immediatament la nota activa |
+| `Ctrl + F` | Cerca al document o a la llista de notes |
+| `Ctrl + Enter` | Executa la cerca acadèmica o envia consulta a NotebookLM |
 
 ---
 
@@ -225,33 +253,18 @@ faristol ~/Documents/Biblioteca/pdfs/berzosaPensamentComputacional2024.pdf
 # Obrir una nota directament a Faristol
 faristol @berzosaPensamentComputacional2024.md
 
-# Especificar un port alternatiu
+# Especificar un port alternatiu o mode sense navegador
 faristol --port 8090
-
-# Executar en mode servidor sense obrir el navegador
 faristol --no-browser
 ```
 
 ---
 
-## ⌨️ Dreceres de Teclat a Faristol
-
-| Drecera | Acció |
-| :--- | :--- |
-| `Alt + 1` | Activa el Plafó Lateral |
-| `Alt + 2` | Activa el Visor de PDF |
-| `Alt + 3` | Activa l'Editor de Notes |
-| `Ctrl + S` | Desa la nota activa |
-| `Ctrl + F` | Cerca al document o a la llista de notes |
-| `Ctrl + Enter` | Executa la cerca acadèmica / Envia consulta a NotebookLM |
-
----
-
 ## ⚠️ Avís de Responsabilitat i Projecte Personal
 
-Aquest és un **projecte personal de recerca i desenvolupament**, concebut per a donar resposta a les necessitats particulars d'estudi de l'autor:
-- **Sense garanties (*AS-IS*):** Es distribueix sota la llicència MIT de forma totalment gratuïta i comunitària, «tal com és», sense cap garantia explícita ni implícita de cap mena.
-- **Exempció de responsabilitat:** L'autor no es fa responsable de cap pèrdua d'informació, corrupció de fitxers, fallades del sistema, pèrdues de dades o danys directes o indirectes derivats de l'ús d'aquest programari. **Recomanem fermament als usuaris mantindre còpies de seguretat periòdiques (amb Git, Borg, Restic o similars) de les seues notes, PDFs i bases de dades.**
+Aquest és un **projecte personal de recerca i desenvolupament**, concebut per donar resposta a les necessitats particulars d'estudi de l'autor:
+- **Sense garanties (*AS-IS*):** Es distribueix sota la llicència MIT de forma gratuïta i comunitària, «tal com és», sense cap garantia explícita ni implícita.
+- **Exempció de responsabilitat:** L'autor no es fa responsable de cap pèrdua d'informació, corrupció de fitxers o fallades del sistema. **Recomanem fermament als usuaris mantindre còpies de seguretat periòdiques (amb Git, Borg, Restic o similars) de les seues notes, PDFs i bases de dades.**
 - **Respecte als drets d'autor:** L'usuari és l'únic responsable dels documents que descarrega, emmagatzema, visualitza o indexa a la seua biblioteca local.
 
 ---
@@ -267,5 +280,4 @@ Aquest és un **projecte personal de recerca i desenvolupament**, concebut per a
 
 ## 📄 Llicència
 
-Distribuït sota la llicència [MIT](LICENSE).  
-Desenvolupat amb passió pel programari lliure, el text pla i la sobirania digital.
+Distribuït sota la llicència [MIT](LICENSE). Desenvolupat amb passió pel programari lliure, el text pla i la sobirania digital.
