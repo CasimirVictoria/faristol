@@ -226,7 +226,7 @@ Configuració i metadades auxiliars:
 - Navegador web modern (Firefox, Chromium, Brave).
 - Opcional: `okular` (visor natiu KDE), `kate` (editor natiu KDE), `nlm` (NotebookLM CLI).
 
-### Instal·lació ràpida
+### Instal·lació automàtica (amb servei Systemd)
 
 ```bash
 # 1. Clonar el repositori
@@ -236,11 +236,42 @@ cd ~/Projects/faristol
 # 2. Instal·lar dependències
 pip install -r requirements.txt
 
-# 3. Enllaçar l'executable al teu PATH
-ln -sf ~/Projects/faristol/bin/faristol ~/.local/bin/faristol
+# 3. Executar l'instal·lador (enllaça l'executable i activa el servei systemd)
+chmod +x install.sh
+./install.sh
 ```
 
-### Execució
+---
+
+## ⚙️ Servei de Fons Systemd (Arrencada Automàtica)
+
+Faristol inclou una unitat de servei d'usuari a [`systemd/faristol.service`](systemd/faristol.service) per funcionar de forma permanent en segon pla:
+- **Arrencada silenciosa i persistent:** S'inicia automàticament a cada inici de sessió de Linux.
+- **Accés universal:** Escolta a `0.0.0.0:8080`, fent-lo accessible immediatament tant en local (`http://localhost:8080`) com a través de la teua xarxa privada segura de **Tailscale** (`http://<IP-Tailscale>:8080`) des del mòbil o tauleta.
+- **Reinici automàtic:** Si el procés s'atura per qualsevol motiu, systemd el reinicia automàticament en 3 segons.
+
+### Gestió del servei
+
+```bash
+# Activar i arrencar el servei immediatament
+systemctl --user enable --now faristol.service
+
+# Comprovar l'estat del servei
+systemctl --user status faristol.service
+
+# Veure el registre d'activitat (logs) en temps real
+journalctl --user -u faristol -f
+
+# Reiniciar o aturar el servei
+systemctl --user restart faristol.service
+systemctl --user stop faristol.service
+```
+
+---
+
+## 💻 Execució Manual per Consola
+
+Si prefereixes executar Faristol de forma interactiva sense el servei systemd:
 
 ```bash
 # Iniciar Faristol i obrir el navegador automàticament (port 8080)
@@ -253,7 +284,7 @@ faristol ~/Documents/Biblioteca/pdfs/berzosaPensamentComputacional2024.pdf
 # Obrir una nota directament a Faristol
 faristol @berzosaPensamentComputacional2024.md
 
-# Especificar un port alternatiu o mode sense navegador
+# Especificar un port alternatiu o mode sense obrir navegador
 faristol --port 8090
 faristol --no-browser
 ```
