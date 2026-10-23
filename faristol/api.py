@@ -8,6 +8,7 @@ import json
 import glob
 import shutil
 import asyncio
+import time
 import logging
 import urllib.parse
 import subprocess
@@ -16,7 +17,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from faristol.config import (
@@ -618,6 +619,84 @@ async def esborrar_subratllat_pdf(highlight_id: str, path: str = Query(...)):
 # =====================================================================
 # 3. BIBLIOTECA I FONTS
 # =====================================================================
+
+def get_library_signature() -> str:
+    """Calcula una signatura ràpida basada en els mtimes dels directoris i fitxers clau."""
+    try:
+        b_mtime = BIB_FILE_PATH.stat().st_mtime if BIB_FILE_PATH.exists() else 0
+    except Exception:
+        b_mtime = 0
+    try:
+        c_mtime = COLLECTIONS_FILE.stat().st_mtime if COLLECTIONS_FILE.exists() else 0
+    except Exception:
+        c_mtime = 0
+    try:
+        f_mtime = FONTS_DIR.stat().st_mtime if FONTS_DIR.exists() else 0
+    except Exception:
+        f_mtime = 0
+    try:
+        n_mtime = NOTAS_DIR.stat().st_mtime if NOTAS_DIR.exists() else 0
+    except Exception:
+        n_mtime = 0
+
+    return f"{b_mtime:.3f}_{c_mtime:.3f}_{f_mtime:.3f}_{n_mtime:.3f}"
+
+library_change_event = asyncio.Event()
+
+@router.get("/library/status")
+async def obtenir_estat_biblioteca():
+    """Retorna la signatura actual de la biblioteca per a comprovació ràpida."""
+    sig = get_library_signature()
+    return {
+        "status": "ok",
+        "signature": sig,
+        "timestamp": time.time()
+    }
+
+@router.post("/library/notify-change")
+async def notificar_canvi_biblioteca():
+    """Permet a zotero-receiver, add-paper o altres eines notificar canvis immediatament."""
+    library_change_event.set()
+    return {"status": "ok", "message": "Canvi notificat correctament"}
+
+@router.get("/library/events")
+async def stream_esdeveniments_biblioteca():
+    """SSE (Server-Sent Events) per sincronitzar la interfície de Faristol a l'instant en segon pla."""
+    async def generador():
+        last_sig = get_library_signature()
+        yield f"event: connected\ndata: {json.dumps({'signature': last_sig})}\n\n"
+        while True:
+            try:
+                explicit_trigger = False
+                try:
+                    await asyncio.wait_for(library_change_event.wait(), timeout=1.2)
+                    library_change_event.clear()
+                    explicit_trigger = True
+                except asyncio.TimeoutError:
+                    pass
+
+                cur_sig = get_library_signature()
+                if explicit_trigger or cur_sig != last_sig:
+                    last_sig = cur_sig
+                    payload = json.dumps({"signature": cur_sig, "event": "library-changed"})
+                    yield f"event: change\ndata: {payload}\n\n"
+                else:
+                    yield ": ping\n\n"
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error en stream SSE de biblioteca: {e}")
+                await asyncio.sleep(2.0)
+
+    return StreamingResponse(
+        generador(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @router.get("/fonts/list")
 async def llistar_fonts():

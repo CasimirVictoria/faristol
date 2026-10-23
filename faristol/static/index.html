@@ -2308,17 +2308,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     configurarSplitters();
     configurarDragAndDrop();
     await carregarDadesBiblioteca();
+    iniciarSincronitzacioBiblioteca();
     processarParametresUrl();
 });
 
 // --- Carregar Dades des de l'API ---
-async function carregarDadesBiblioteca() {
-    el.libraryStatus.textContent = 'Carregant...';
+async function carregarDadesBiblioteca(silencios = false) {
+    if (!silencios) el.libraryStatus.textContent = 'Carregant...';
     try {
         const [notesRes, fontsRes, colsRes] = await Promise.all([
-            fetch('/api/notes'),
-            fetch('/api/fonts/list'),
-            fetch('/api/plec/collections')
+            fetch('/api/notes?_t=' + Date.now()),
+            fetch('/api/fonts/list?_t=' + Date.now()),
+            fetch('/api/plec/collections?_t=' + Date.now())
         ]);
         
         const notesData = await notesRes.json();
@@ -2335,7 +2336,17 @@ async function carregarDadesBiblioteca() {
         if (el.tabNotesBtn) el.tabNotesBtn.title = `Notes (${state.notes.length})`;
         if (el.tabPdfsBtn) el.tabPdfsBtn.title = `PDFs (${state.pdfs.length})`;
         if (el.tabLibraryBtn) el.tabLibraryBtn.title = `Biblioteca completa (${state.notes.length} notes · ${state.pdfs.length} PDFs)`;
-        el.libraryStatus.textContent = `${state.collections.length} carpetes · ${state.notes.length} notes · ${state.pdfs.length} PDFs`;
+        
+        if (silencios) {
+            el.libraryStatus.innerHTML = '<span style="color: #10b981;"><i class="fa-solid fa-circle-check"></i> Biblioteca sincronitzada</span>';
+            setTimeout(() => {
+                if (el.libraryStatus && el.libraryStatus.innerHTML.includes('fa-circle-check')) {
+                    el.libraryStatus.textContent = `${state.collections.length} carpetes · ${state.notes.length} notes · ${state.pdfs.length} PDFs`;
+                }
+            }, 2500);
+        } else {
+            el.libraryStatus.textContent = `${state.collections.length} carpetes · ${state.notes.length} notes · ${state.pdfs.length} PDFs`;
+        }
         
         actualitzarNomColleccioActiva();
         renderitzarTags();
@@ -2346,6 +2357,78 @@ async function carregarDadesBiblioteca() {
         console.error("Error carregant biblioteca:", e);
         el.libraryStatus.textContent = "Error connectant amb l'API";
     }
+}
+
+// --- Sincronització Automàtica en Temps Real (Zero F5 / Zero Reload) ---
+function iniciarSincronitzacioBiblioteca() {
+    let darreraSignatura = null;
+    let sseSource = null;
+    let recarregant = false;
+
+    async function recarregarSiCanvia() {
+        if (recarregant) return;
+        recarregant = true;
+        try {
+            await carregarDadesBiblioteca(true);
+        } finally {
+            recarregant = false;
+        }
+    }
+
+    async function comprovarSignaturaRemota() {
+        try {
+            const res = await fetch('/api/library/status?_t=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (darreraSignatura === null) {
+                darreraSignatura = data.signature;
+                return;
+            }
+            if (data.signature && data.signature !== darreraSignatura) {
+                darreraSignatura = data.signature;
+                await recarregarSiCanvia();
+            }
+        } catch (e) {}
+    }
+
+    function connectarSSE() {
+        if (!window.EventSource) return;
+        try {
+            if (sseSource) sseSource.close();
+            sseSource = new EventSource('/api/library/events');
+            sseSource.addEventListener('connected', (e) => {
+                try {
+                    const d = JSON.parse(e.data);
+                    if (d && d.signature) darreraSignatura = d.signature;
+                } catch(err) {}
+            });
+            sseSource.addEventListener('change', async (e) => {
+                try {
+                    const d = JSON.parse(e.data);
+                    if (d && d.signature) darreraSignatura = d.signature;
+                    await recarregarSiCanvia();
+                } catch(err) {}
+            });
+            sseSource.onerror = () => {
+                if (sseSource) sseSource.close();
+                setTimeout(connectarSSE, 5000);
+            };
+        } catch(e) {
+            console.warn("SSE no disponible a Faristol, s'empra polling:", e);
+        }
+    }
+
+    // 1. Iniciar canal SSE d'alta reactivitat
+    connectarSSE();
+
+    // 2. Refresc instantani en recuperar el focus de la pestanya
+    window.addEventListener('focus', comprovarSignaturaRemota);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) comprovarSignaturaRemota();
+    });
+
+    // 3. Polling de seguretat suau cada 3 segons
+    setInterval(comprovarSignaturaRemota, 3000);
 }
 
 // --- Helpers Carpetes Virtuals i Documents Unificats ---
