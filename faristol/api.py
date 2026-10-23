@@ -40,9 +40,62 @@ from faristol.utils import (
     obtenir_notes_associades_pdf
 )
 from faristol.bibtex import GestorBibtex
+from faristol.fsatomic import escriure_atomic, bloqueig, llegir_json_segur
+import ipaddress
+import socket
 
 logger = logging.getLogger("faristol.api")
 router = APIRouter(prefix="/api")
+
+def _ruta_segura_nota(filename: str) -> Path:
+    """
+    Valida i resol un nom de fitxer per a NOTAS_DIR.
+    Rebutja caràcters perillosos, separadors de directori, '..', i enllaços que n'escapen.
+    """
+    if not filename or not isinstance(filename, str):
+        raise HTTPException(status_code=400, detail="Nom de fitxer no proporcionat")
+    
+    clean_name = urllib.parse.unquote(filename).strip()
+    if "/" in clean_name or "\\" in clean_name or "\x00" in clean_name or clean_name in (".", ".."):
+        raise HTTPException(status_code=400, detail="Nom de fitxer no vàlid (separadors o traversal no permesos)")
+    
+    path_final = (NOTAS_DIR / clean_name).resolve()
+    if not path_final.is_relative_to(NOTAS_DIR.resolve()) or path_final.parent != NOTAS_DIR.resolve():
+        raise HTTPException(status_code=400, detail="Ruta fora del directori de notes permès")
+    
+    return path_final
+
+def _document_segur(ref: str) -> Path:
+    """
+    Valida i resol un fitxer de document (PDF o HTML).
+    Permet nom de fitxer o ruta absoluta, però verifica estrictament que
+    el fitxer resolt resideixi DINS de FONTS_DIR o NOTAS_DIR.
+    """
+    if not ref or not isinstance(ref, str):
+        raise HTTPException(status_code=400, detail="Ruta de document buida")
+    
+    clean_ref = urllib.parse.unquote(ref).strip()
+    if "\x00" in clean_ref:
+        raise HTTPException(status_code=400, detail="Caràcter nul no permès")
+    
+    p = Path(clean_ref)
+    candidats = []
+    
+    if p.is_absolute():
+        candidats.append(p.resolve())
+    else:
+        parts = p.parts
+        if ".." in parts:
+            raise HTTPException(status_code=400, detail="Traversal ('..') no permès")
+        candidats.append((FONTS_DIR / p.name).resolve())
+        candidats.append((NOTAS_DIR / p.name).resolve())
+    
+    for cand in candidats:
+        if cand.is_relative_to(FONTS_DIR.resolve()) or cand.is_relative_to(NOTAS_DIR.resolve()):
+            if cand.is_file():
+                return cand
+    
+    raise HTTPException(status_code=404, detail="Document no trobat a la biblioteca o notes")
 
 # =====================================================================
 # MODELS PYDANTIC
@@ -207,7 +260,7 @@ async def llistar_notes(q: Optional[str] = None, tag: Optional[str] = None):
 @router.get("/notes/{filename}")
 async def llegir_nota(filename: str):
     """Llegeix el contingut complet d'una nota i en detecta PDFs i pàgines."""
-    path = NOTAS_DIR / filename
+    path = _ruta_segura_nota(filename)
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
@@ -249,14 +302,14 @@ async def llegir_nota(filename: str):
 
 @router.put("/notes/{filename}")
 async def guardar_nota(filename: str, req: GuardarNotaRequest):
-    """Guarda els canvis en una nota existent."""
-    path = NOTAS_DIR / filename
-    if not path.exists():
+    """Guarda els canvis en una nota existent de forma atòmica i protegida contra concurrència."""
+    path = _ruta_segura_nota(filename)
+    if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
     try:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(req.contingut)
+        with bloqueig(path):
+            escriure_atomic(path, req.contingut)
 
         stat = path.stat()
         return {
@@ -270,10 +323,10 @@ async def guardar_nota(filename: str, req: GuardarNotaRequest):
 
 @router.delete("/notes/{filename}")
 async def esborrar_nota(filename: str):
-    """Mou la nota a la paperera de reciclatge."""
-    path = NOTAS_DIR / filename
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Nota no trobada")
+    """Mou la nota a la paperera de reciclatge comprovant estrictament que sigui un fitxer regular."""
+    path = _ruta_segura_nota(filename)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Nota no trobada o no és un fitxer")
 
     ok = enviar_a_la_papelera(path)
     if not ok:
@@ -316,7 +369,8 @@ citekey: "@{clean_stem}"
 ## Cites i Anotacions
 
 """
-        path_fitxer.write_text(contingut, encoding="utf-8")
+        with bloqueig(path_fitxer):
+            escriure_atomic(path_fitxer, contingut)
         return {"status": "created", "filename": nom_fitxer, "path": str(path_fitxer.resolve())}
 
     slug = netejar_text_slug(titol_clean)
@@ -337,7 +391,7 @@ citekey: "@{clean_stem}"
         contingut = req.contingut
     else:
         contingut = f"""---
-title: "{titol_clean}"
+title: {json.dumps(titol_clean, ensure_ascii=False)}
 date: {avui}
 tags: {json.dumps(tags_list, ensure_ascii=False)}
 ---
@@ -345,7 +399,8 @@ tags: {json.dumps(tags_list, ensure_ascii=False)}
 # {titol_clean}
 
 """
-    path_fitxer.write_text(contingut, encoding="utf-8")
+    with bloqueig(path_fitxer):
+        escriure_atomic(path_fitxer, contingut)
     return {
         "status": "created",
         "filename": nom_fitxer,
@@ -355,8 +410,8 @@ tags: {json.dumps(tags_list, ensure_ascii=False)}
 @router.get("/notes/{filename}/connections")
 async def obtenir_connexions(filename: str):
     """Calcula els retroenllaços (backlinks) i enllaços sortints (outlinks) d'una nota."""
-    path_actual = NOTAS_DIR / filename
-    if not path_actual.exists():
+    path_actual = _ruta_segura_nota(filename)
+    if not path_actual.exists() or not path_actual.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
     try:
@@ -432,7 +487,7 @@ async def rescatar_pdf_nota(filename: str):
     """
     Intenta recuperar el PDF d'una nota bibliogràfica (@citekey) des de ~/Downloads o fonts obertes.
     """
-    path = NOTAS_DIR / filename
+    path = _ruta_segura_nota(filename)
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
@@ -481,21 +536,19 @@ async def rescatar_pdf_nota(filename: str):
         if trobat and target_pdf.is_file():
             try:
                 if BIB_FILE_PATH.exists():
-                    bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
-                    if f"{{{citekey}," in bib_text:
-                        if "file =" in bib_text:
-                            bib_text_nou = re.sub(
-                                rf'(@\w+\s*\{{\s*{re.escape(citekey)},[\s\S]*?file\s*=\s*\{{)[^}}]+(\}})',
-                                rf'\g<1>{str(target_pdf)}\g<2>',
-                                bib_text
-                            )
-                        else:
-                            bib_text_nou = re.sub(
-                                rf'(@\w+\s*\{{\s*{re.escape(citekey)},)',
-                                rf'\g<1>\n  file = {{{str(target_pdf)}}},',
-                                bib_text
-                            )
-                        BIB_FILE_PATH.write_text(bib_text_nou, encoding="utf-8")
+                    with bloqueig(BIB_FILE_PATH):
+                        bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
+                        # Expressió regular acotada estrictament a l'entrada del citekey
+                        patro_especific = re.compile(rf'(@\w+\s*\{{\s*{re.escape(citekey)}\s*,[\s\S]*?\n\}})(?=@|\Z)', re.MULTILINE)
+                        m_ent = patro_especific.search(bib_text)
+                        if m_ent:
+                            entrada_antiga = m_ent.group(1)
+                            if re.search(r'file\s*=\s*\{[^}]*\}', entrada_antiga):
+                                entrada_nova = re.sub(r'file\s*=\s*\{[^}]*\}', f'file = {{{str(target_pdf)}}}', entrada_antiga)
+                            else:
+                                entrada_nova = re.sub(rf'(@\w+\s*\{{\s*{re.escape(citekey)}\s*,)', rf'\g<1>\n  file = {{{str(target_pdf)}}},', entrada_antiga)
+                            bib_text_nou = bib_text[:m_ent.start()] + entrada_nova + bib_text[m_ent.end():]
+                            escriure_atomic(BIB_FILE_PATH, bib_text_nou, backup=True)
             except Exception as e_bib:
                 logger.warning(f"Error actualitzant file a bibtex: {e_bib}")
 
@@ -521,99 +574,89 @@ async def rescatar_pdf_nota(filename: str):
 @router.get("/pdf/stream")
 async def servir_pdf(path: str = Query(..., description="Ruta absoluta o relativa del PDF o Snapshot HTML")):
     """Serveix un fitxer PDF o Snapshot HTML de forma segura per a ser renderitzat al navegador."""
-    pdf_path = Path(urllib.parse.unquote(path)).resolve()
-
-    if not pdf_path.exists() or not pdf_path.is_file():
-        if (FONTS_DIR / pdf_path.name).exists():
-            pdf_path = (FONTS_DIR / pdf_path.name).resolve()
-        elif (NOTAS_DIR / pdf_path.name).exists():
-            pdf_path = (NOTAS_DIR / pdf_path.name).resolve()
-        else:
-            raise HTTPException(status_code=404, detail="Fitxer no trobat")
+    pdf_path = _document_segur(path)
 
     ext = pdf_path.suffix.lower()
     if ext not in [".pdf", ".html", ".htm"]:
         raise HTTPException(status_code=400, detail="El fitxer sol·licitat no és un PDF ni un Snapshot HTML")
 
     media_type = "text/html; charset=utf-8" if ext in [".html", ".htm"] else "application/pdf"
+    
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0"
+    }
+
+    # Aïllament i protecció estricta per a Snapshots HTML (desactiva scripts i aïlla el context)
+    if ext in [".html", ".htm"]:
+        headers["Content-Security-Policy"] = (
+            "sandbox allow-same-origin; "
+            "script-src 'none'; "
+            "object-src 'none'; "
+            "form-action 'none'; "
+            "base-uri 'none';"
+        )
 
     return FileResponse(
         str(pdf_path),
         media_type=media_type,
         content_disposition_type="inline",
         filename=pdf_path.name,
-        headers={
-            "Accept-Ranges": "bytes",
-            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
-            "Pragma": "no-cache",
-            "Expires": "0"
-        }
+        headers=headers
     )
 
 @router.get("/pdf/highlights")
 async def obtenir_subratllats_pdf(path: str = Query(..., description="Ruta del PDF")):
     """Retorna tots els subratllats guardats per a un PDF concret."""
-    pdf_path = str(Path(urllib.parse.unquote(path)).resolve())
-    if not HIGHLIGHTS_FILE.exists():
-        return {"highlights": []}
-
-    try:
-        with open(HIGHLIGHTS_FILE, "r", encoding="utf-8") as f:
-            tots = json.load(f)
+    pdf_path = str(_document_segur(path))
+    with bloqueig(HIGHLIGHTS_FILE):
+        tots = llegir_json_segur(HIGHLIGHTS_FILE, {})
         return {"highlights": tots.get(pdf_path, [])}
-    except Exception:
-        return {"highlights": []}
 
 @router.post("/pdf/highlights")
 async def desar_subratllat_pdf(req: SaveHighlightRequest):
-    """Guarda un nou subratllat persistent associat a un PDF."""
-    pdf_path = str(Path(req.pdf_path).resolve())
-    tots = {}
-    if HIGHLIGHTS_FILE.exists():
-        try:
-            with open(HIGHLIGHTS_FILE, "r", encoding="utf-8") as f:
-                tots = json.load(f)
-        except Exception:
+    """Guarda un nou subratllat persistent associat a un PDF de forma atòmica."""
+    pdf_path = str(_document_segur(req.pdf_path))
+    with bloqueig(HIGHLIGHTS_FILE):
+        tots = llegir_json_segur(HIGHLIGHTS_FILE, {})
+        if not isinstance(tots, dict):
             tots = {}
 
-    if pdf_path not in tots:
-        tots[pdf_path] = []
+        if pdf_path not in tots:
+            tots[pdf_path] = []
 
-    nou_item = {
-        "id": f"{req.page}_{int(datetime.now().timestamp() * 1000)}",
-        "page": req.page,
-        "text": req.text,
-        "rects": req.rects,
-        "color": req.color,
-        "comment": req.comment,
-        "created_at": datetime.now().isoformat()
-    }
-    tots[pdf_path].append(nou_item)
+        nou_item = {
+            "id": f"{req.page}_{int(datetime.now().timestamp() * 1000)}",
+            "page": req.page,
+            "text": req.text,
+            "rects": req.rects,
+            "color": req.color,
+            "comment": req.comment,
+            "created_at": datetime.now().isoformat()
+        }
+        tots[pdf_path].append(nou_item)
 
-    try:
-        with open(HIGHLIGHTS_FILE, "w", encoding="utf-8") as f:
-            json.dump(tots, f, ensure_ascii=False, indent=2)
-        return {"status": "ok", "highlight": nou_item}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            escriure_atomic(HIGHLIGHTS_FILE, json.dumps(tots, ensure_ascii=False, indent=2))
+            return {"status": "ok", "highlight": nou_item}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/pdf/highlights/{highlight_id}")
 async def esborrar_subratllat_pdf(highlight_id: str, path: str = Query(...)):
-    """Esborra un subratllat concret d'un PDF."""
-    pdf_path = str(Path(urllib.parse.unquote(path)).resolve())
-    if not HIGHLIGHTS_FILE.exists():
-        return {"status": "ok"}
-
-    try:
-        with open(HIGHLIGHTS_FILE, "r", encoding="utf-8") as f:
-            tots = json.load(f)
-        if pdf_path in tots:
+    """Esborra un subratllat concret d'un PDF de forma atòmica."""
+    pdf_path = str(_document_segur(path))
+    with bloqueig(HIGHLIGHTS_FILE):
+        tots = llegir_json_segur(HIGHLIGHTS_FILE, {})
+        if isinstance(tots, dict) and pdf_path in tots:
             tots[pdf_path] = [h for h in tots[pdf_path] if h.get("id") != highlight_id]
-            with open(HIGHLIGHTS_FILE, "w", encoding="utf-8") as f:
-                json.dump(tots, f, ensure_ascii=False, indent=2)
+            try:
+                escriure_atomic(HIGHLIGHTS_FILE, json.dumps(tots, ensure_ascii=False, indent=2))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
         return {"status": "ok"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =====================================================================
@@ -1175,12 +1218,8 @@ async def plec_status():
 
 @router.post("/plec/open-external")
 async def plec_open_external(req: PlecOpenExternalRequest):
-    """Obre el PDF amb el visor natiu del sistema (Okular / xdg-open)."""
-    p = Path(req.pdf)
-    if not p.is_file():
-        p = FONTS_DIR / req.pdf
-    if not p.exists():
-        raise HTTPException(status_code=404, detail="PDF no trobat")
+    """Obre el PDF amb el visor natiu del sistema (Okular / xdg-open) amb comprovació estricta de ruta."""
+    p = _document_segur(req.pdf)
 
     try:
         subprocess.Popen(["okular", str(p.resolve())])
@@ -1194,11 +1233,9 @@ async def plec_open_external(req: PlecOpenExternalRequest):
 
 @router.post("/plec/open-note-external")
 async def plec_open_note_external(req: PlecOpenNoteExternalRequest):
-    """Obre la nota amb l'editor natiu del sistema (Kate / Obsidian / xdg-open)."""
-    p = Path(req.filename)
+    """Obre la nota amb l'editor natiu del sistema (Kate / Obsidian / xdg-open) amb comprovació estricta de ruta."""
+    p = _ruta_segura_nota(req.filename)
     if not p.is_file():
-        p = NOTAS_DIR / req.filename
-    if not p.exists():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
     try:
@@ -1225,21 +1262,24 @@ async def plec_open_note_external(req: PlecOpenNoteExternalRequest):
 
 @router.post("/plec/save-pdf")
 async def plec_save_pdf(request: Request, filename: str = Query(..., description="Nom del fitxer PDF o HTML a desar")):
-    """Desa les modificacions i anotacions del PDF o Snapshot HTML directament sobre el fitxer físic original a disc."""
+    """Desa les modificacions i anotacions del PDF o Snapshot HTML directament sobre el fitxer físic original a disc de forma atòmica."""
     content = await request.body()
     if not content:
         raise HTTPException(status_code=400, detail="Contingut binari buit")
 
-    clean_name = Path(urllib.parse.unquote(filename)).name
-    target_pdf = FONTS_DIR / clean_name
-    if not target_pdf.exists():
-        if (NOTAS_DIR / clean_name).exists():
-            target_pdf = NOTAS_DIR / clean_name
-        else:
-            raise HTTPException(status_code=404, detail="Fitxer no trobat a la biblioteca")
+    clean_raw = Path(urllib.parse.unquote(filename)).name
+    if not clean_raw or clean_raw in (".", "..") or "/" in clean_raw or "\\" in clean_raw:
+        raise HTTPException(status_code=400, detail="Nom de fitxer no vàlid")
+
+    target_pdf = _document_segur(clean_raw)
+    ext = target_pdf.suffix.lower()
+
+    if ext == ".pdf" and not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="El contingut no correspon a un fitxer PDF vàlid (falta capçalera %PDF)")
 
     try:
-        target_pdf.write_bytes(content)
+        with bloqueig(target_pdf):
+            escriure_atomic(target_pdf, content, backup=True)
         return {
             "status": "ok",
             "message": f"Fitxer {target_pdf.name} desat correctament a disc",
@@ -1251,15 +1291,7 @@ async def plec_save_pdf(request: Request, filename: str = Query(..., description
 @router.get("/plec/extract-highlights")
 async def plec_extract_highlights(pdf: str = Query(..., description="Nom o ruta del fitxer PDF o HTML")):
     """Extreu tots els subratllats i anotacions d'un PDF (via PyMuPDF) o d'un Snapshot HTML (<mark>) i highlights.json."""
-    clean_name = Path(urllib.parse.unquote(pdf)).name
-    target_pdf = FONTS_DIR / clean_name
-    if not target_pdf.exists():
-        if (NOTAS_DIR / clean_name).exists():
-            target_pdf = NOTAS_DIR / clean_name
-        elif Path(pdf).is_file():
-            target_pdf = Path(pdf)
-        else:
-            raise HTTPException(status_code=404, detail="Fitxer no trobat")
+    target_pdf = _document_segur(pdf)
 
     if target_pdf.suffix.lower() in [".html", ".htm"]:
         highlights = []
@@ -1334,9 +1366,8 @@ async def plec_extract_highlights(pdf: str = Query(..., description="Nom o ruta 
 @router.post("/plec/create-companion-note")
 async def plec_create_companion_note(req: PlecCompanionNoteRequest):
     """Crea una nota associada a un PDF existent si encara no en té."""
-    pdf_filename = req.pdf
-    p = Path(pdf_filename)
-    stem = p.stem
+    real_pdf = _document_segur(req.pdf)
+    stem = real_pdf.stem
     clean_stem = re.sub(r'[^a-zA-Z0-9_\-]', '', stem)
 
     candidats = [f"@{clean_stem}.md", f"@{clean_stem}.org", f"{clean_stem}.md", f"@{stem}.md", f"{stem}.md"]
@@ -1344,7 +1375,6 @@ async def plec_create_companion_note(req: PlecCompanionNoteRequest):
         if (NOTAS_DIR / c).exists():
             return {"status": "exists", "note": c, "message": "La nota ja existeix"}
 
-    real_pdf = FONTS_DIR / pdf_filename if not p.is_file() else p
     titol = stem
     if real_pdf.exists():
         try:
@@ -1359,21 +1389,21 @@ async def plec_create_companion_note(req: PlecCompanionNoteRequest):
             pass
 
     nota_name = f"@{clean_stem}.md"
-    nota_path = NOTAS_DIR / nota_name
+    nota_path = _ruta_segura_nota(nota_name)
     avui = datetime.now().strftime("%Y-%m-%d")
 
     contingut = f"""---
-title: "{titol}"
+title: {json.dumps(titol, ensure_ascii=False)}
 date: {avui}
 tags: ["lectura"]
 citekey: "@{clean_stem}"
-pdf: "{pdf_filename}"
+pdf: "{real_pdf.name}"
 ---
 
 # {titol}
 
 ## Metadades
-- **Fitxer PDF:** [[{pdf_filename}]]
+- **Fitxer PDF:** [[{real_pdf.name}]]
 - **Data d'obertura:** {avui}
 
 ## Resum & Idees Clau
@@ -1383,15 +1413,16 @@ pdf: "{pdf_filename}"
 ## Cites i Anotacions
 
 """
-    nota_path.write_text(contingut, encoding="utf-8")
+    with bloqueig(nota_path):
+        escriure_atomic(nota_path, contingut)
     return {"status": "created", "note": nota_name, "message": "Nota creada correctament"}
 
 @router.post("/plec/upload-pdf")
 async def plec_upload_pdf(request: Request, filename: str = Query(..., description="Nom del fitxer PDF")):
-    """Puja un PDF, el desa a FONTS_DIR, n'extrau metadades i crea la seua nota Markdown associada."""
+    """Puja un PDF, el desa a FONTS_DIR, n'extrau metadades i crea la seua nota Markdown associada de forma segura."""
     content = await request.body()
-    if not content:
-        raise HTTPException(status_code=400, detail="Contingut buit")
+    if not content or not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Contingut no vàlid: cal un fitxer PDF amb capçalera %PDF")
 
     try:
         import fitz
@@ -1404,7 +1435,16 @@ async def plec_upload_pdf(request: Request, filename: str = Query(..., descripti
         clean_name += ".pdf"
 
     dest_pdf = FONTS_DIR / clean_name
-    dest_pdf.write_bytes(content)
+    if dest_pdf.exists():
+        s_base = dest_pdf.stem
+        cnt = 2
+        while (FONTS_DIR / f"{s_base}_{cnt}.pdf").exists():
+            cnt += 1
+        dest_pdf = FONTS_DIR / f"{s_base}_{cnt}.pdf"
+        clean_name = dest_pdf.name
+
+    with bloqueig(dest_pdf):
+        escriure_atomic(dest_pdf, content)
 
     stem = dest_pdf.stem
     clean_stem = re.sub(r'[^a-zA-Z0-9_\-]', '', stem)
@@ -1424,12 +1464,12 @@ async def plec_upload_pdf(request: Request, filename: str = Query(..., descripti
             pass
 
     nota_name = f"@{clean_stem}.md"
-    nota_path = NOTAS_DIR / nota_name
+    nota_path = _ruta_segura_nota(nota_name)
     avui = datetime.now().strftime("%Y-%m-%d")
 
     if not nota_path.exists():
         nota_content = f"""---
-title: "{titol}"
+title: {json.dumps(titol, ensure_ascii=False)}
 date: {avui}
 tags: ["paper", "lectura"]
 citekey: "@{clean_stem}"
@@ -1450,7 +1490,8 @@ pdf: "{clean_name}"
 ## Cites i Anotacions
 
 """
-        nota_path.write_text(nota_content, encoding="utf-8")
+        with bloqueig(nota_path):
+            escriure_atomic(nota_path, nota_content)
 
     return {
         "status": "ok",
@@ -1463,25 +1504,56 @@ pdf: "{clean_name}"
 
 @router.post("/plec/ingest-url")
 async def plec_ingest_url(req: PlecIngestUrlRequest):
-    """Descarrega un PDF d'un enllaç URL, el desa a FONTS_DIR i crea la nota associada."""
+    """Descarrega un PDF d'un enllaç URL amb protecció contra SSRF i escriptura atòmica."""
     import urllib.request
     url = req.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL buida")
 
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="Només es permeten URLs http:// o https:// (esquemes com file:// estan prohibits)")
+    if not parsed.hostname:
+        raise HTTPException(status_code=400, detail="Nom d'amfitrió invàlid")
+
+    # Protecció estricta contra SSRF: resolució DNS i comprovació d'adreces IP internes
     try:
-        parsed = urllib.parse.urlparse(url)
+        addr_info = socket.getaddrinfo(parsed.hostname, None)
+        for addr in addr_info:
+            ip_obj = ipaddress.ip_address(addr[4][0])
+            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_reserved or ip_obj.is_multicast:
+                raise HTTPException(status_code=400, detail="Accés denegat: la URL apunta a una IP de xarxa privada o reservada")
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="No s'ha pogut resoldre el nom d'amfitrió de la URL")
+
+    try:
         path_leaf = Path(parsed.path).name
         if not path_leaf or not path_leaf.lower().endswith(".pdf"):
             path_leaf = f"document_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
         clean_name = re.sub(r'[^\w\-_\.]', '_', path_leaf)
         dest_pdf = FONTS_DIR / clean_name
+        if dest_pdf.exists():
+            s_base = dest_pdf.stem
+            cnt = 2
+            while (FONTS_DIR / f"{s_base}_{cnt}.pdf").exists():
+                cnt += 1
+            dest_pdf = FONTS_DIR / f"{s_base}_{cnt}.pdf"
+            clean_name = dest_pdf.name
 
         req_headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"}
         request_obj = urllib.request.Request(url, headers=req_headers)
-        with urllib.request.urlopen(request_obj, timeout=30) as response, open(dest_pdf, "wb") as out_file:
-            out_file.write(response.read())
+        
+        MAX_SIZE = 100 * 1024 * 1024  # 100 MB màxim
+        with urllib.request.urlopen(request_obj, timeout=30) as response:
+            content = response.read(MAX_SIZE + 1)
+            if len(content) > MAX_SIZE:
+                raise HTTPException(status_code=400, detail="El fitxer supera el límit permès de 100 MB")
+            if not content.startswith(b"%PDF"):
+                raise HTTPException(status_code=400, detail="El recurs descarregat no és un document PDF vàlid")
+
+        with bloqueig(dest_pdf):
+            escriure_atomic(dest_pdf, content)
 
         try:
             import fitz
@@ -1498,12 +1570,12 @@ async def plec_ingest_url(req: PlecIngestUrlRequest):
         stem = dest_pdf.stem
         clean_stem = re.sub(r'[^a-zA-Z0-9_\-]', '', stem)
         nota_name = f"@{clean_stem}.md"
-        nota_path = NOTAS_DIR / nota_name
+        nota_path = _ruta_segura_nota(nota_name)
         avui = datetime.now().strftime("%Y-%m-%d")
 
         if not nota_path.exists():
             nota_content = f"""---
-title: "{titol}"
+title: {json.dumps(titol, ensure_ascii=False)}
 date: {avui}
 tags: ["web", "lectura"]
 citekey: "@{clean_stem}"
@@ -1526,7 +1598,8 @@ url: "{url}"
 ## Cites i Anotacions
 
 """
-            nota_path.write_text(nota_content, encoding="utf-8")
+            with bloqueig(nota_path):
+                escriure_atomic(nota_path, nota_content)
 
         return {
             "status": "ok",
@@ -1535,6 +1608,8 @@ url: "{url}"
             "title": titol,
             "pages": num_pagines
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error descarregant el PDF: {e}")
 
@@ -1544,21 +1619,15 @@ url: "{url}"
 # =====================================================================
 
 def _carregar_colleccions() -> dict:
-    if not COLLECTIONS_FILE.exists():
-        return {"collections": []}
-    try:
-        with open(COLLECTIONS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if not isinstance(data, dict) or "collections" not in data:
-                return {"collections": []}
-            return data
-    except Exception:
-        return {"collections": []}
+    with bloqueig(COLLECTIONS_FILE):
+        data = llegir_json_segur(COLLECTIONS_FILE, {"collections": []})
+        if not isinstance(data, dict) or "collections" not in data:
+            return {"collections": []}
+        return data
 
 def _desar_colleccions(dades: dict):
-    COLLECTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(COLLECTIONS_FILE, "w", encoding="utf-8") as f:
-        json.dump(dades, f, indent=2, ensure_ascii=False)
+    with bloqueig(COLLECTIONS_FILE):
+        escriure_atomic(COLLECTIONS_FILE, json.dumps(dades, indent=2, ensure_ascii=False))
     try:
         subprocess.Popen(["kate-sync-project", "--quiet"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
@@ -1818,8 +1887,12 @@ async def sync_collection_notebooklm(col_id: str):
                 data = json.loads(out)
                 notebook_id = data.get("id") or data.get("notebook_id")
                 if notebook_id:
-                    col["notebook_id"] = notebook_id
-                    _desar_colleccions(dades)
+                    fresh_dades = _carregar_colleccions()
+                    for c_item in fresh_dades.get("collections", []):
+                        if c_item.get("id") == col_id:
+                            c_item["notebook_id"] = notebook_id
+                            break
+                    _desar_colleccions(fresh_dades)
             except Exception:
                 pass
 
@@ -2071,9 +2144,11 @@ async def nlm_esborrar_element(req: NlmDeleteRequest):
 
 @router.post("/nlm/synthesize")
 async def nlm_guardar_sintesi(req: NlmSintesiRequest):
-    """Injecta una síntesi estructurada de NotebookLM a la nota especificada."""
-    path = NOTAS_DIR / req.fitxer_desti
-    if not path.exists():
+    """Injecta una síntesi estructurada de NotebookLM a la nota especificada de forma atòmica i amb comprovació estricta de ruta."""
+    path = _ruta_segura_nota(req.fitxer_desti)
+    if path.suffix.lower() not in (".md", ".org"):
+        raise HTTPException(status_code=400, detail="Només es permet afegir síntesi a fitxers de notes .md o .org")
+    if not path.is_file():
         raise HTTPException(status_code=404, detail="Nota de destinació no trobada")
 
     ara_str = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -2086,8 +2161,9 @@ async def nlm_guardar_sintesi(req: NlmSintesiRequest):
 > {req.resposta.strip()}
 """
     try:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(bloc)
-        return {"status": "ok", "message": f"Síntesi injectada a {req.fitxer_desti}"}
+        with bloqueig(path):
+            contingut_actual = path.read_text(encoding="utf-8", errors="replace")
+            escriure_atomic(path, contingut_actual + bloc)
+        return {"status": "ok", "message": f"Síntesi injectada a {path.name}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

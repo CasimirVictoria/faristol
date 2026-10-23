@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/Projects/faristol
-ExecStart=/usr/bin/python3 -m uvicorn faristol.server:app --host 0.0.0.0 --port 8080
+ExecStart=/usr/bin/python3 -m uvicorn faristol.server:app --host 127.0.0.1 --port 8080
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
