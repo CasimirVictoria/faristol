@@ -2319,7 +2319,7 @@ async function carregarDadesBiblioteca(silencios = false) {
         const [notesRes, fontsRes, colsRes] = await Promise.all([
             fetch('/api/notes?_t=' + Date.now()),
             fetch('/api/fonts/list?_t=' + Date.now()),
-            fetch('/api/plec/collections?_t=' + Date.now())
+            fetch('/api/collections?_t=' + Date.now())
         ]);
         
         const notesData = await notesRes.json();
@@ -4233,7 +4233,7 @@ async function obrirPdf(filename, obrirNotaAssociada = true, paginaInicial = 1, 
         } else {
             // Demanar a l'API que cree la nota d'acompanyament automàticament
             try {
-                const res = await fetch('/api/plec/create-companion-note', {
+                const res = await fetch('/api/faristol/create-companion-note', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pdf: filename })
@@ -4384,8 +4384,16 @@ async function desarSnapshotHtmlActual() {
         if (!el.pdfFrame || !el.pdfFrame.contentDocument || !state.activePdfFilename) return;
         if (!/\.html?$/i.test(state.activePdfFilename)) return;
         window.notificarGuardatPdf('saving', 'Guardant snapshot...');
-        const htmlOut = '<!DOCTYPE html>\n' + el.pdfFrame.contentDocument.documentElement.outerHTML;
-        const res = await fetch(`/api/plec/save-pdf?filename=${encodeURIComponent(state.activePdfFilename)}`, {
+        const cloneDoc = el.pdfFrame.contentDocument.documentElement.cloneNode(true);
+        const snapStyle = cloneDoc.querySelector('#faristol-snap-style');
+        if (snapStyle) snapStyle.remove();
+        cloneDoc.querySelectorAll('[data-faristol-flash]').forEach(elFlash => {
+            elFlash.style.backgroundColor = elFlash.getAttribute('data-faristol-orig-bg') || '';
+            elFlash.removeAttribute('data-faristol-flash');
+            elFlash.removeAttribute('data-faristol-orig-bg');
+        });
+        const htmlOut = '<!DOCTYPE html>\n' + cloneDoc.outerHTML;
+        const res = await fetch(`/api/faristol/save-pdf?filename=${encodeURIComponent(state.activePdfFilename)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'text/html; charset=utf-8' },
             body: htmlOut
@@ -4410,15 +4418,40 @@ function resaltarSeleccioAlPdf() {
         if (state.activePdfFilename && /\.html?$/i.test(state.activePdfFilename) && cd) {
             const range = estatSeleccioPdf.range;
             if (!range) return;
-            const mark = cd.createElement('mark');
-            mark.className = 'faristol-highlight';
-            mark.setAttribute('data-faristol-ts', Date.now().toString());
-            try {
-                range.surroundContents(mark);
-            } catch (eSurround) {
-                const frag = range.extractContents();
-                mark.appendChild(frag);
-                range.insertNode(mark);
+            const ts = Date.now().toString();
+            const crearMark = () => {
+                const m = cd.createElement('mark');
+                m.className = 'faristol-highlight';
+                m.setAttribute('data-faristol-ts', ts);
+                return m;
+            };
+            if (range.startContainer === range.endContainer && range.startContainer.nodeType === Node.TEXT_NODE) {
+                range.surroundContents(crearMark());
+            } else {
+                const textNodes = [];
+                const rootNode = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+                    ? range.commonAncestorContainer.parentNode
+                    : range.commonAncestorContainer;
+                const walker = cd.createTreeWalker(rootNode, NodeFilter.SHOW_TEXT, {
+                    acceptNode: (node) => {
+                        if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                    }
+                });
+                let current;
+                while ((current = walker.nextNode())) {
+                    textNodes.push(current);
+                }
+                for (const tNode of textNodes) {
+                    const subRange = cd.createRange();
+                    const startOff = (tNode === range.startContainer) ? range.startOffset : 0;
+                    const endOff = (tNode === range.endContainer) ? range.endOffset : tNode.nodeValue.length;
+                    if (endOff > startOff) {
+                        subRange.setStart(tNode, startOff);
+                        subRange.setEnd(tNode, endOff);
+                        subRange.surroundContents(crearMark());
+                    }
+                }
             }
             const sel = cw.getSelection ? cw.getSelection() : null;
             if (sel) sel.removeAllRanges();
@@ -4430,8 +4463,8 @@ function resaltarSeleccioAlPdf() {
         const app = cw.PDFViewerApplication;
         if (!app) return;
 
-        if (typeof app.plecHighlightSelection === 'function') {
-            app.plecHighlightSelection(estatSeleccioPdf.range);
+        if (typeof app.faristolHighlightSelection === 'function') {
+            app.faristolHighlightSelection(estatSeleccioPdf.range);
         } else {
             const uiManager = app.pdfViewer?._layerProperties?.annotationEditorUIManager;
             if (uiManager && typeof uiManager.highlightSelection === 'function') {
@@ -4500,16 +4533,25 @@ function saltarAPaginaPdf(pageNum, textDeCerca = null) {
         // Cas Snapshot HTML (.html)
         if (state.activePdfFilename && /\.html?$/i.test(state.activePdfFilename) && cd) {
             if (textDeCerca) {
-                const net = textDeCerca.replace(/^[*_~`"'«»“„>\s:;]+|[*_~`"'«»”\s:;]+$/g, '').trim();
+                const net = textDeCerca.normalize('NFKC')
+                    .replace(/([a-zA-ZÀ-ÿ])-\s*\n\s*([a-zA-ZÀ-ÿ])/g, '$1$2')
+                    .replace(/^[*_~`"'«»“„>\s:;]+|[*_~`"'«»”\s:;]+$/g, '').trim();
                 const fragment = net.split(/\s+/).filter(Boolean).slice(0, 6).join(' ');
                 if (fragment) {
                     const marks = cd.querySelectorAll('mark.faristol-highlight, p, li, blockquote, h1, h2, h3');
                     for (const m of marks) {
-                        if (m.textContent && m.textContent.toLowerCase().includes(fragment.toLowerCase())) {
+                        const mNorm = (m.textContent || '').normalize('NFKC').replace(/\s+/g, ' ').toLowerCase();
+                        if (mNorm.includes(fragment.toLowerCase())) {
                             m.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             const origBg = m.style.backgroundColor;
+                            m.setAttribute('data-faristol-flash', '1');
+                            m.setAttribute('data-faristol-orig-bg', origBg || '');
                             m.style.backgroundColor = 'rgba(56, 189, 248, 0.45)';
-                            setTimeout(() => { m.style.backgroundColor = origBg; }, 2000);
+                            setTimeout(() => {
+                                m.style.backgroundColor = origBg;
+                                m.removeAttribute('data-faristol-flash');
+                                m.removeAttribute('data-faristol-orig-bg');
+                            }, 2000);
                             return;
                         }
                     }
@@ -4530,7 +4572,9 @@ function saltarAPaginaPdf(pageNum, textDeCerca = null) {
 
         // 2. Si tenim fragment de text, fer cerca i ressaltat exacte amb el motor de cerca de PDF.js
         if (textDeCerca) {
-            const net = textDeCerca.replace(/^[*_~`"'«»“„>\s:;]+|[*_~`"'«»”\s:;]+$/g, '').trim();
+            const normText = textDeCerca.normalize('NFKC')
+                .replace(/([a-zA-ZÀ-ÿ])-\s*\n\s*([a-zA-ZÀ-ÿ])/g, '$1$2');
+            const net = normText.replace(/^[*_~`"'«»“„>\s:;]+|[*_~`"'«»”\s:;]+$/g, '').trim();
             const paraulesTotals = net.split(/\s+/).filter(Boolean);
             
             if (paraulesTotals.length > 0 && cw.PDFViewerApplication.eventBus) {
@@ -4541,8 +4585,8 @@ function saltarAPaginaPdf(pageNum, textDeCerca = null) {
                 if (cand1) candidats.push(cand1);
                 
                 // Candidat 2: Si hi havia salt de línia, agafar la línia amb més text
-                if (textDeCerca.includes('\n')) {
-                    const linies = textDeCerca.split('\n')
+                if (normText.includes('\n')) {
+                    const linies = normText.split('\n')
                         .map(l => l.replace(/^["'«»“„>\s]+|["'«»”\s]+$/g, '').trim())
                         .filter(l => l.length > 6);
                     linies.forEach(l => {
@@ -4574,7 +4618,7 @@ function saltarAPaginaPdf(pageNum, textDeCerca = null) {
                             highlightAll: true,
                             findPrevious: false,
                             query: query,
-                            type: "again"
+                            type: ""
                         });
                     } catch(errFind) {
                         console.warn("Avís cercant text al PDF:", errFind);
@@ -4780,13 +4824,13 @@ function configurarEvents() {
 
     // Cerca acadèmica federada events
     if (el.btnSearchAcademic) {
-        el.btnSearchAcademic.onclick = () => executarCercaAcademicaPlec();
+        el.btnSearchAcademic.onclick = () => executarCercaAcademicaFaristol();
     }
     if (el.searchAcademicInput) {
         el.searchAcademicInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                executarCercaAcademicaPlec();
+                executarCercaAcademicaFaristol();
             }
         });
     }
@@ -4938,7 +4982,7 @@ function configurarEvents() {
             el.btnSyncNotebooklm.disabled = true;
 
             try {
-                const res = await fetch(`/api/plec/collections/${encodeURIComponent(col.id)}/sync-notebooklm`, {
+                const res = await fetch(`/api/collections/${encodeURIComponent(col.id)}/sync-notebooklm`, {
                     method: 'POST'
                 });
                 const data = await res.json();
@@ -5626,7 +5670,7 @@ function toggleSwapPanells() {
             el.panelCenter.style.width = savedPdfSide + 'px';
             el.panelEditor.style.width = '';
         } else {
-            const savedEditor = localStorage.getItem('plec_editor_width') || '440';
+            const savedEditor = localStorage.getItem('faristol_editor_width') || '440';
             el.panelEditor.style.width = savedEditor + 'px';
             el.panelCenter.style.width = '';
         }
@@ -5660,7 +5704,7 @@ async function obrirAmbOkular() {
         return;
     }
     try {
-        await fetch('/api/plec/open-external', {
+        await fetch('/api/faristol/open-external', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pdf: state.activePdfFilename })
@@ -5677,8 +5721,8 @@ function configurarSplitters() {
 
     // Recuperar mides desades de sessions anteriors
     try {
-        const savedLib = localStorage.getItem('plec_lib_width');
-        const savedEditor = localStorage.getItem('plec_editor_width');
+        const savedLib = localStorage.getItem('faristol_lib_width');
+        const savedEditor = localStorage.getItem('faristol_editor_width');
         const savedPdfSide = localStorage.getItem('faristol_pdf_side_width');
         const isEditorCenter = localStorage.getItem('faristol_layout_editor_center') === '1';
 
@@ -5733,7 +5777,7 @@ function configurarSplitters() {
 
             try {
                 if (!el.panelLibrary.classList.contains('collapsed')) {
-                    localStorage.setItem('plec_lib_width', el.panelLibrary.offsetWidth);
+                    localStorage.setItem('faristol_lib_width', el.panelLibrary.offsetWidth);
                 }
                 const isEditorCenter = el.workspace.classList.contains('layout-editor-center');
                 if (isEditorCenter) {
@@ -5742,7 +5786,7 @@ function configurarSplitters() {
                     }
                 } else {
                     if (!el.panelEditor.classList.contains('collapsed')) {
-                        localStorage.setItem('plec_editor_width', el.panelEditor.offsetWidth);
+                        localStorage.setItem('faristol_editor_width', el.panelEditor.offsetWidth);
                     }
                 }
 
@@ -5813,7 +5857,7 @@ function configurarDragAndDrop() {
 async function pujarFitxerPdf(file) {
     el.libraryStatus.textContent = `Pujant ${file.name}...`;
     try {
-        const url = `/api/plec/upload-pdf?filename=${encodeURIComponent(file.name)}`;
+        const url = `/api/faristol/upload-pdf?filename=${encodeURIComponent(file.name)}`;
         const res = await fetch(url, {
             method: 'POST',
             body: file
@@ -5844,7 +5888,7 @@ async function importarPdfPerUrl() {
     el.libraryStatus.textContent = "Descarregant PDF des de la xarxa...";
     
     try {
-        const res = await fetch('/api/plec/ingest-url', {
+        const res = await fetch('/api/faristol/ingest-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: url })
@@ -5911,7 +5955,7 @@ async function importarPaperZoterless() {
 }
 
 // --- Cerca Acadèmica Federada (18 fonts) ---
-async function executarCercaAcademicaPlec() {
+async function executarCercaAcademicaFaristol() {
     const q = (el.searchAcademicInput ? el.searchAcademicInput.value : '').trim();
     if (!q) {
         alert("Escriu una paraula clau o DOI per cercar!");
@@ -6124,8 +6168,8 @@ async function executarCercaAcademicaPlec() {
                             <span style="color: #10b981; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
                                 <i class="fa-solid fa-check"></i> A la biblioteca
                             </span>
-                            ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${noteCand.filename}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
-                            ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${pdfCand.filename}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
+                            ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${escapeHtml(noteCand.filename)}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
+                            ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${escapeHtml(pdfCand.filename)}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
                         ` : `
                             <button class="btn btn-sm ${isLeg || isBio ? '' : 'btn-primary'}" id="btn-import-card-${idx}" onclick="importarArticleDesDeCerca('${escapeHtml(ident).replace(/'/g, "\\'")}', ${idx}, '${escapeHtml(directPdfToPass).replace(/'/g, "\\'")}')" style="font-size: 11px; padding: 3px 8px; ${btnBg}">
                                 <i class="fa-solid ${btnIcon}"></i> ${btnLabel}
@@ -6183,8 +6227,8 @@ async function importarArticleDesDeCerca(ident, idx, pdfUrl = '') {
                     <span style="color: #10b981; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
                         <i class="fa-solid fa-check"></i> Ingerit!
                     </span>
-                    ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${noteCand.filename}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
-                    ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${pdfCand.filename}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
+                    ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${escapeHtml(noteCand.filename)}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
+                    ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${escapeHtml(pdfCand.filename)}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
                 `;
             }
         } else {
@@ -6260,8 +6304,8 @@ async function importarSubratllatsPdf() {
     try {
         if (el.pdfFrame && el.pdfFrame.contentWindow && el.pdfFrame.contentWindow.PDFViewerApplication) {
             const app = el.pdfFrame.contentWindow.PDFViewerApplication;
-            if (typeof app.plecSaveDocument === 'function') {
-                await app.plecSaveDocument();
+            if (typeof app.faristolSaveDocument === 'function') {
+                await app.faristolSaveDocument();
             }
         }
     } catch(eSave) {
@@ -6270,7 +6314,7 @@ async function importarSubratllatsPdf() {
 
     try {
         actualitzarEstatGuardat('saving', 'Important subratllats...');
-        const res = await fetch(`/api/plec/extract-highlights?pdf=${encodeURIComponent(state.activePdfFilename)}`);
+        const res = await fetch(`/api/faristol/extract-highlights?pdf=${encodeURIComponent(state.activePdfFilename)}`);
         if (!res.ok) throw new Error("Error cridant l'API d'extracció");
         
         const data = await res.json();
@@ -6339,7 +6383,7 @@ async function importarSubratllatsPdf() {
 // --- Gestió de Col·leccions Virtuals (CRUD & Assignacions) ---
 async function afegirItemAColleccio(colId, type, filename) {
     try {
-        const res = await fetch(`/api/plec/collections/${encodeURIComponent(colId)}/add-item`, {
+        const res = await fetch(`/api/collections/${encodeURIComponent(colId)}/add-item`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: type, filename: filename })
@@ -6362,7 +6406,7 @@ async function afegirItemAColleccio(colId, type, filename) {
 
 async function treureItemDeColleccio(colId, type, filename) {
     try {
-        const res = await fetch(`/api/plec/collections/${encodeURIComponent(colId)}/remove-item`, {
+        const res = await fetch(`/api/collections/${encodeURIComponent(colId)}/remove-item`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: type, filename: filename })
@@ -6425,7 +6469,7 @@ async function guardarColleccioForm() {
     
     if (editId) {
         try {
-            const res = await fetch(`/api/plec/collections/${encodeURIComponent(editId)}`, {
+            const res = await fetch(`/api/collections/${encodeURIComponent(editId)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name })
@@ -6444,7 +6488,7 @@ async function guardarColleccioForm() {
     } else {
         const parentId = document.getElementById('new-collection-parent').value || null;
         try {
-            const res = await fetch('/api/plec/collections/create', {
+            const res = await fetch('/api/collections/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name, parent_id: parentId })
@@ -6469,7 +6513,7 @@ async function eliminarColleccio(colId) {
     if (!conf) return;
     
     try {
-        const res = await fetch(`/api/plec/collections/${encodeURIComponent(colId)}`, {
+        const res = await fetch(`/api/collections/${encodeURIComponent(colId)}`, {
             method: 'DELETE'
         });
         if (res.ok) {
@@ -6524,7 +6568,7 @@ async function desarAssignacioColleccions() {
     const selectedIds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
     
     try {
-        const res = await fetch('/api/plec/collections/set-item-collections', {
+        const res = await fetch('/api/collections/set-item-collections', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -6538,7 +6582,7 @@ async function desarAssignacioColleccions() {
             if (data.collections_data) {
                 state.collections = data.collections_data;
             } else {
-                const colsRes = await fetch('/api/plec/collections');
+                const colsRes = await fetch('/api/collections');
                 if (colsRes.ok) {
                     const colsData = await colsRes.json();
                     state.collections = colsData.collections || [];
@@ -6635,7 +6679,7 @@ async function obrirAmbKate() {
         await guardarNotaActual();
     }
     try {
-        const resp = await fetch('/api/plec/open-note-external', {
+        const resp = await fetch('/api/faristol/open-note-external', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filename: state.activeNoteFilename })
@@ -6842,7 +6886,7 @@ function tancarModals() {
 
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function urlSegura(u) {

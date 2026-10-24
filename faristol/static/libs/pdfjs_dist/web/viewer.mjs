@@ -19631,7 +19631,7 @@ const PDFViewerApplication = {
         const params = new URLSearchParams(window.location.search);
         const pdfNom = params.get("nom_pdf") || params.get("filename") || "";
         if (pdfNom && data) {
-          fetch(`/api/plec/save-pdf?filename=${encodeURIComponent(pdfNom)}`, {
+          fetch(`/api/faristol/save-pdf?filename=${encodeURIComponent(pdfNom)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/pdf' },
             body: data
@@ -20081,13 +20081,13 @@ const PDFViewerApplication = {
     const {
       annotationStorage
     } = pdfDocument;
-    let _plecAutoSaveTimer = null;
+    let _faristolAutoSaveTimer = null;
     annotationStorage.onSetModified = () => {
       this._annotationStorageModified = true;
-      if (_plecAutoSaveTimer) {
-        clearTimeout(_plecAutoSaveTimer);
+      if (_faristolAutoSaveTimer) {
+        clearTimeout(_faristolAutoSaveTimer);
       }
-      _plecAutoSaveTimer = setTimeout(async () => {
+      _faristolAutoSaveTimer = setTimeout(async () => {
         try {
           if (window.parent && window.parent.notificarGuardatPdf) {
             window.parent.notificarGuardatPdf('saving', 'Guardant anotacions al PDF...');
@@ -20100,7 +20100,7 @@ const PDFViewerApplication = {
           const params = new URLSearchParams(window.location.search);
           const pdfNom = params.get("nom_pdf") || params.get("filename") || "";
           if (pdfNom && pdfBytes) {
-            const resp = await fetch(`/api/plec/save-pdf?filename=${encodeURIComponent(pdfNom)}`, {
+            const resp = await fetch(`/api/faristol/save-pdf?filename=${encodeURIComponent(pdfNom)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/pdf' },
               body: pdfBytes
@@ -20121,10 +20121,10 @@ const PDFViewerApplication = {
         }
       }, 1000);
     };
-    this.plecSaveDocument = async () => {
-      if (_plecAutoSaveTimer) {
-        clearTimeout(_plecAutoSaveTimer);
-        _plecAutoSaveTimer = null;
+    this.faristolSaveDocument = async () => {
+      if (_faristolAutoSaveTimer) {
+        clearTimeout(_faristolAutoSaveTimer);
+        _faristolAutoSaveTimer = null;
       }
       try {
         if (window.parent && window.parent.notificarGuardatPdf) {
@@ -20138,7 +20138,7 @@ const PDFViewerApplication = {
         const params = new URLSearchParams(window.location.search);
         const pdfNom = params.get("nom_pdf") || params.get("filename") || "";
         if (pdfNom && pdfBytes) {
-          const resp = await fetch(`/api/plec/save-pdf?filename=${encodeURIComponent(pdfNom)}`, {
+          const resp = await fetch(`/api/faristol/save-pdf?filename=${encodeURIComponent(pdfNom)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/pdf' },
             body: pdfBytes
@@ -20153,7 +20153,7 @@ const PDFViewerApplication = {
         console.error("Error guardant anotacions del PDF:", err);
       }
     };
-    this.plecHighlightSelection = async (savedRange = null) => {
+    this.faristolHighlightSelection = async (savedRange = null) => {
       try {
         const uiManager = this.pdfViewer?._layerProperties?.annotationEditorUIManager;
         if (!uiManager) return false;
@@ -20181,7 +20181,7 @@ const PDFViewerApplication = {
           return true;
         }
       } catch (err) {
-        console.warn("Avís ressaltant selecció a Plec:", err);
+        console.warn("Avís ressaltant selecció a Faristol:", err);
       }
       return false;
     };

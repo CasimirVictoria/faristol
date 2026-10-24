@@ -43,10 +43,19 @@ async def verificar_origen_csrf(request: Request, call_next):
     # Validar peticions amb canvi d'estat (POST, PUT, DELETE, PATCH)
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
+    sec_fetch_site = request.headers.get("sec-fetch-site", "").lower()
     host_header = request.headers.get("host", "").lower().split(":")[0]
+
+    if sec_fetch_site == "cross-site":
+        return JSONResponse(
+            {"detail": "Petició cross-site bloquejada per protecció CSRF (Sec-Fetch-Site)."},
+            status_code=403
+        )
 
     font_verificacio = origin or referer
     if font_verificacio:
+        if origin and origin.strip().lower() == "null":
+            return JSONResponse({"detail": "Origen 'null' no autoritzat per protecció CSRF."}, status_code=403)
         try:
             parsed = urllib.parse.urlparse(font_verificacio)
             origin_host = (parsed.hostname or "").lower()
@@ -103,11 +112,6 @@ async def servir_faristol():
             }
         )
     return {"message": "Faristol Web API activa. Falta index.html a static/"}
-
-# Ruta /plec (retrocompatibilitat)
-@app.get("/plec")
-async def servir_plec():
-    return await servir_faristol()
 
 # Muntar fitxers estàtics (PDF.js, Vditor, KaTeX, FontAwesome, CSS, JS)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

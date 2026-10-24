@@ -22,7 +22,6 @@ dependencies = [
 
 [project.scripts]
 faristol = "faristol.bin.faristol:main"
-plec = "faristol.bin.faristol:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

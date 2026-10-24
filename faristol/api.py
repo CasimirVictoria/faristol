@@ -1,5 +1,5 @@
 """
-API FastAPI per a Plec - Entorn de lectura, anotació i síntesi bibliogràfica.
+API FastAPI per a Faristol - Entorn de lectura, anotació i síntesi bibliogràfica.
 """
 import os
 import sys
@@ -123,16 +123,16 @@ class AcademicImportRequest(BaseModel):
     vpn: bool = False
     pdf_url: Optional[str] = None
 
-class PlecCompanionNoteRequest(BaseModel):
+class FaristolCompanionNoteRequest(BaseModel):
     pdf: str
 
-class PlecOpenExternalRequest(BaseModel):
+class FaristolOpenExternalRequest(BaseModel):
     pdf: str
 
-class PlecOpenNoteExternalRequest(BaseModel):
+class FaristolOpenNoteExternalRequest(BaseModel):
     filename: str
 
-class PlecIngestUrlRequest(BaseModel):
+class FaristolIngestUrlRequest(BaseModel):
     url: str
 
 class NovaColleccioRequest(BaseModel):
@@ -328,7 +328,7 @@ async def esborrar_nota(filename: str):
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada o no és un fitxer")
 
-    ok = enviar_a_la_papelera(path)
+    ok = await asyncio.to_thread(enviar_a_la_papelera, path)
     if not ok:
         raise HTTPException(status_code=500, detail="No s'ha pogut moure la nota a la paperera")
     return {"status": "ok", "message": f"Nota {filename} moguda a la paperera"}
@@ -486,12 +486,13 @@ async def obtenir_connexions(filename: str):
 async def rescatar_pdf_nota(filename: str):
     """
     Intenta recuperar el PDF d'una nota bibliogràfica (@citekey) des de ~/Downloads o fonts obertes.
+    S'executa en un fil de treball per no bloquejar l'event loop d'Uvicorn.
     """
     path = _ruta_segura_nota(filename)
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
-    try:
+    def _rescatar_sync() -> dict:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
 
@@ -523,9 +524,9 @@ async def rescatar_pdf_nota(filename: str):
         trobat = check_and_import_from_downloads(target_pdf, title=titol, abstract=abstract, doi=doi, pmid=pmid)
 
         # 2. Si no es troba a Downloads i té DOI, provar descarregar via add-paper / Unpaywall
-        if not trobat and doi:
+        if not trobat and doi and not doi.startswith("-"):
             add_paper_cmd = shutil.which("add-paper") or str(Path.home() / ".local" / "bin" / "add-paper")
-            proc = subprocess.run([add_paper_cmd, f"https://doi.org/{doi}"], capture_output=True, text=True, timeout=30)
+            subprocess.run([add_paper_cmd, f"https://doi.org/{doi}"], capture_output=True, text=True, timeout=30)
             if target_pdf.is_file():
                 is_val, _ = is_valid_pdf_content(target_pdf, title=titol, abstract=abstract, doi=doi)
                 if is_val:
@@ -538,7 +539,6 @@ async def rescatar_pdf_nota(filename: str):
                 if BIB_FILE_PATH.exists():
                     with bloqueig(BIB_FILE_PATH):
                         bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
-                        # Expressió regular acotada estrictament a l'entrada del citekey
                         patro_especific = re.compile(rf'(@\w+\s*\{{\s*{re.escape(citekey)}\s*,[\s\S]*?\n\}})(?=@|\Z)', re.MULTILINE)
                         m_ent = patro_especific.search(bib_text)
                         if m_ent:
@@ -562,6 +562,9 @@ async def rescatar_pdf_nota(filename: str):
                 "status": "not_found",
                 "message": "No s'ha trobat cap PDF coincident a ~/Downloads ni en accés obert."
             }
+
+    try:
+        return await asyncio.to_thread(_rescatar_sync)
     except Exception as e:
         logger.error(f"Error rescatant PDF per a {filename}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -807,7 +810,13 @@ async def obtenir_referencies_bibtex(q: Optional[str] = None):
 # 4. CERCA ACADÈMICA FEDERADA & IMPORTACIÓ ZOTERLESS + MCP LOCAL
 # =====================================================================
 
+_MCP_OPEN_DATA_MOD = None
+_MCP_REAL_ESTATE_MOD = None
+
 def _get_mcp_open_data():
+    global _MCP_OPEN_DATA_MOD
+    if _MCP_OPEN_DATA_MOD is not None:
+        return _MCP_OPEN_DATA_MOD
     open_dir = Path.home() / "Projects" / "mcp-server-open-data-spain"
     if open_dir.exists():
         import glob
@@ -819,12 +828,16 @@ def _get_mcp_open_data():
             spec = importlib.util.spec_from_file_location("open_data_srv", str(open_dir / "server.py"))
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
+            _MCP_OPEN_DATA_MOD = mod
             return mod
         except Exception as e:
             logger.warning(f"Error importing open-data-spain server: {e}")
     return None
 
 def _get_mcp_real_estate():
+    global _MCP_REAL_ESTATE_MOD
+    if _MCP_REAL_ESTATE_MOD is not None:
+        return _MCP_REAL_ESTATE_MOD
     real_dir = Path.home() / "Projects" / "mcp-server-real-estate-spain"
     if real_dir.exists():
         import glob
@@ -836,6 +849,7 @@ def _get_mcp_real_estate():
             spec = importlib.util.spec_from_file_location("real_estate_srv", str(real_dir / "server.py"))
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
+            _MCP_REAL_ESTATE_MOD = mod
             return mod
         except Exception as e:
             logger.warning(f"Error importing real-estate-spain server: {e}")
@@ -1053,17 +1067,17 @@ async def cerca_academica_federada(
     """Cerca federada multilingüe a través d'academic-spain, open-data-spain i real-estate-spain."""
     s_clean = (sources or "all").lower().strip()
 
-    # Route specific MCP servers directly
+    # Route specific MCP servers directly in worker thread
     if s_clean in ["opendata", "datosgob", "ine", "bdns"]:
-        results = _query_open_data_spain(q, limit=limit, specific="opendata")
+        results = await asyncio.to_thread(_query_open_data_spain, q, limit, "opendata")
         return {"query": q, "translations": {}, "total": len(results), "results": results}
 
     if s_clean == "europarl":
-        results = _query_open_data_spain(q, limit=limit, specific="europarl")
+        results = await asyncio.to_thread(_query_open_data_spain, q, limit, "europarl")
         return {"query": q, "translations": {}, "total": len(results), "results": results}
 
     if s_clean in ["catastro", "immobiliari", "realestate"]:
-        results = _query_real_estate_spain(q)
+        results = await asyncio.to_thread(_query_real_estate_spain, q)
         return {"query": q, "translations": {}, "total": len(results), "results": results}
 
     # Query academic-spain
@@ -1100,7 +1114,7 @@ async def cerca_academica_federada(
 
             # If searching BOE, augment with real-time BOE sumario from open-data-spain
             if s_clean in ["boe", "legislacio"]:
-                boe_extra = _query_open_data_spain(q, limit=limit, specific="boe")
+                boe_extra = await asyncio.to_thread(_query_open_data_spain, q, limit, "boe")
                 existing_titles = {r["title"].lower() for r in results}
                 for bx in boe_extra:
                     if bx["title"].lower() not in existing_titles:
@@ -1122,11 +1136,13 @@ async def cerca_academica_federada(
 async def importar_article_zoterless(req: AcademicImportRequest):
     """Descarrega el PDF, afegeix l'entrada a biblioteca.bib i crea la nota @citekey.md mitjançant add-paper o crea la nota directa de dades."""
     ident = req.identifier.strip()
+    if not ident or ident.startswith("-"):
+        raise HTTPException(status_code=400, detail="Identificador d'article no vàlid")
 
     # Direct note generation for Catastro, Real Estate or OpenData resources without PDF
     if not req.pdf_url and (ident.startswith("catastro_") or ident.startswith("realestate_") or ident.startswith("opendata_") or ident.startswith("ine_") or ident.startswith("bdns_") or ident.startswith("europarl_")):
         clean_key = re.sub(r'[^a-zA-Z0-9_]', '_', ident)
-        note_file = NOTAS_DIR / f"@{clean_key}.md"
+        note_file = _ruta_segura_nota(f"@{clean_key}.md")
 
         title = ident
         extra_content = ""
@@ -1136,10 +1152,11 @@ async def importar_article_zoterless(req: AcademicImportRequest):
             rc = ident.replace("catastro_", "").upper()
             title = f"Immoble Cadastral {rc}"
             tags = ["catastro", "immobles", "patrimoni"]
-            r_mod = _get_mcp_real_estate()
+            r_mod = await asyncio.to_thread(_get_mcp_real_estate)
             if r_mod:
                 try:
-                    c_info = json.loads(r_mod.query_catastro(rc))
+                    raw_cat = await asyncio.to_thread(r_mod.query_catastro, rc)
+                    c_info = json.loads(raw_cat)
                     adr = c_info.get("adreca") or ""
                     mun = c_info.get("municipi") or ""
                     prov = c_info.get("provincia") or ""
@@ -1163,10 +1180,11 @@ async def importar_article_zoterless(req: AcademicImportRequest):
             zona = ident.replace("realestate_", "")
             title = f"Mercat Immobiliari: {zona.title()} (La Safor)"
             tags = ["immobiliari", "la_safor", "mercat", "preus"]
-            r_mod = _get_mcp_real_estate()
+            r_mod = await asyncio.to_thread(_get_mcp_real_estate)
             if r_mod:
                 try:
-                    m_info = json.loads(r_mod.analyze_real_estate_market(zona))
+                    raw_mkt = await asyncio.to_thread(r_mod.analyze_real_estate_market, zona)
+                    m_info = json.loads(raw_mkt)
                     extra_content = f"""- **Zona:** {m_info.get('municipio', zona)}
 - **Preu Venda:** {m_info.get('precio_venta_m2')} €/m²
 - **Preu Lloguer:** {m_info.get('precio_alquiler_m2')} €/m²/mes
@@ -1181,9 +1199,9 @@ async def importar_article_zoterless(req: AcademicImportRequest):
                     logger.warning(f"Error fetching real estate details: {e}")
 
         content = f"""---
-title: "{title}"
+title: {json.dumps(title, ensure_ascii=False)}
 date: "{datetime.now().strftime('%Y-%m-%d')}"
-tags: [{', '.join(tags)}]
+tags: {json.dumps(tags, ensure_ascii=False)}
 citekey: "@{clean_key}"
 ---
 
@@ -1191,7 +1209,8 @@ citekey: "@{clean_key}"
 
 {extra_content}
 """
-        note_file.write_text(content, encoding="utf-8")
+        with bloqueig(note_file):
+            escriure_atomic(note_file, content)
         return {
             "status": "ok",
             "message": f"Nota creada correctament: @{clean_key}",
@@ -1203,11 +1222,14 @@ citekey: "@{clean_key}"
     if req.vpn:
         cmd.append("--vpn")
     if req.pdf_url:
-        cmd.extend(["--pdf-url", req.pdf_url.strip()])
+        pdf_u_clean = req.pdf_url.strip()
+        if pdf_u_clean.startswith("-"):
+            raise HTTPException(status_code=400, detail="URL de PDF no vàlida")
+        cmd.extend(["--pdf-url", pdf_u_clean])
     cmd.append(ident)
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        proc = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=60)
         output = proc.stdout + ("\n" + proc.stderr if proc.stderr else "")
         if proc.returncode == 0:
             return {
@@ -1226,12 +1248,12 @@ citekey: "@{clean_key}"
 
 
 # =====================================================================
-# 5. PLEC WORKBENCH ACTIONS
+# 5. FARISTOL WORKBENCH ACTIONS
 # =====================================================================
 
-@router.get("/plec/status")
-async def plec_status():
-    """Retorna l'estat i recompte de fitxers per a Plec Web."""
+@router.get("/faristol/status")
+async def faristol_status():
+    """Retorna l'estat i recompte de fitxers per a Faristol Web."""
     total_notes = len([p for p in NOTAS_DIR.glob("*") if p.is_file() and p.suffix.lower() in [".md", ".org"]])
     total_pdfs = len(list(FONTS_DIR.glob("*.pdf")))
     return {
@@ -1243,23 +1265,35 @@ async def plec_status():
         "total_pdfs": total_pdfs,
     }
 
-@router.post("/plec/open-external")
-async def plec_open_external(req: PlecOpenExternalRequest):
+@router.post("/faristol/open-external")
+async def faristol_open_external(req: FaristolOpenExternalRequest):
     """Obre el PDF amb el visor natiu del sistema (Okular / xdg-open) amb comprovació estricta de ruta."""
     p = _document_segur(req.pdf)
 
     try:
-        subprocess.Popen(["okular", str(p.resolve())])
+        subprocess.Popen(
+            ["okular", str(p.resolve())],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True
+        )
         return {"status": "ok", "message": f"Obert {p.name} amb Okular"}
     except Exception:
         try:
-            subprocess.Popen(["xdg-open", str(p.resolve())])
+            subprocess.Popen(
+                ["xdg-open", str(p.resolve())],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True
+            )
             return {"status": "ok", "message": f"Obert {p.name} amb xdg-open"}
         except Exception as e2:
             raise HTTPException(status_code=500, detail=f"No s'ha pogut obrir el visor extern: {e2}")
 
-@router.post("/plec/open-note-external")
-async def plec_open_note_external(req: PlecOpenNoteExternalRequest):
+@router.post("/faristol/open-note-external")
+async def faristol_open_note_external(req: FaristolOpenNoteExternalRequest):
     """Obre la nota amb l'editor natiu del sistema (Kate / Obsidian / xdg-open) amb comprovació estricta de ruta."""
     p = _ruta_segura_nota(req.filename)
     if not p.is_file():
@@ -1287,8 +1321,8 @@ async def plec_open_note_external(req: PlecOpenNoteExternalRequest):
         except Exception as e2:
             raise HTTPException(status_code=500, detail=f"No s'ha pogut obrir l'editor extern: {e2}")
 
-@router.post("/plec/save-pdf")
-async def plec_save_pdf(request: Request, filename: str = Query(..., description="Nom del fitxer PDF o HTML a desar")):
+@router.post("/faristol/save-pdf")
+async def faristol_save_pdf(request: Request, filename: str = Query(..., description="Nom del fitxer PDF o HTML a desar")):
     """Desa les modificacions i anotacions del PDF o Snapshot HTML directament sobre el fitxer físic original a disc de forma atòmica."""
     content = await request.body()
     if not content:
@@ -1300,6 +1334,8 @@ async def plec_save_pdf(request: Request, filename: str = Query(..., description
 
     target_pdf = _document_segur(clean_raw)
     ext = target_pdf.suffix.lower()
+    if ext not in (".pdf", ".html", ".htm"):
+        raise HTTPException(status_code=400, detail="Només es permet desar fitxers .pdf, .html o .htm")
 
     if ext == ".pdf" and not content.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="El contingut no correspon a un fitxer PDF vàlid (falta capçalera %PDF)")
@@ -1315,35 +1351,76 @@ async def plec_save_pdf(request: Request, filename: str = Query(..., description
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error escrivint fitxer a disc: {e}")
 
-@router.get("/plec/extract-highlights")
-async def plec_extract_highlights(pdf: str = Query(..., description="Nom o ruta del fitxer PDF o HTML")):
+@router.get("/faristol/extract-highlights")
+async def faristol_extract_highlights(pdf: str = Query(..., description="Nom o ruta del fitxer PDF o HTML")):
     """Extreu tots els subratllats i anotacions d'un PDF (via PyMuPDF) o d'un Snapshot HTML (<mark>) i highlights.json."""
     target_pdf = _document_segur(pdf)
+    clean_name = target_pdf.name
 
-    if target_pdf.suffix.lower() in [".html", ".htm"]:
-        highlights = []
-        seen_texts = set()
-        try:
-            html_content = target_pdf.read_text(encoding="utf-8", errors="ignore")
-            for m in re.finditer(r'<mark\b[^>]*class=["\'][^"\']*\bfaristol-highlight\b[^"\']*["\'][^>]*>([\s\S]*?)</mark>', html_content, re.I):
-                raw_t = re.sub(r'<[^>]+>', '', m.group(1)).strip()
-                clean_t = re.sub(r'\s+', ' ', raw_t)
-                if clean_t and clean_t not in seen_texts:
-                    seen_texts.add(clean_t)
-                    highlights.append({"page": 1, "text": clean_t})
-        except Exception:
-            pass
-        if HIGHLIGHTS_FILE.exists():
+    def _extreure_sync() -> dict:
+        if target_pdf.suffix.lower() in [".html", ".htm"]:
+            highlights = []
+            seen_texts = set()
             try:
-                tots = json.loads(HIGHLIGHTS_FILE.read_text(encoding="utf-8"))
-                for key in [str(target_pdf.resolve()), clean_name]:
-                    for h in tots.get(key, []):
-                        clean_t = re.sub(r'\s+', ' ', (h.get("text") or "").strip())
-                        if clean_t and clean_t not in seen_texts:
-                            seen_texts.add(clean_t)
-                            highlights.append({"page": h.get("page", 1), "text": clean_t})
+                html_content = target_pdf.read_text(encoding="utf-8", errors="ignore")
+                for m in re.finditer(r'<mark\b[^>]*class=["\'][^"\']*\bfaristol-highlight\b[^"\']*["\'][^>]*>([\s\S]*?)</mark>', html_content, re.I):
+                    raw_t = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+                    clean_t = re.sub(r'\s+', ' ', raw_t)
+                    if clean_t and clean_t not in seen_texts:
+                        seen_texts.add(clean_t)
+                        highlights.append({"page": 1, "text": clean_t})
             except Exception:
                 pass
+            if HIGHLIGHTS_FILE.exists():
+                try:
+                    with bloqueig(HIGHLIGHTS_FILE):
+                        tots = llegir_json_segur(HIGHLIGHTS_FILE, {})
+                    for key in [str(target_pdf.resolve()), clean_name]:
+                        for h in tots.get(key, []):
+                            clean_t = re.sub(r'\s+', ' ', (h.get("text") or "").strip())
+                            if clean_t and clean_t not in seen_texts:
+                                seen_texts.add(clean_t)
+                                highlights.append({"page": h.get("page", 1), "text": clean_t})
+                except Exception:
+                    pass
+            return {
+                "status": "ok",
+                "pdf": clean_name,
+                "total": len(highlights),
+                "highlights": highlights
+            }
+
+        import fitz
+        doc = fitz.open(str(target_pdf))
+        highlights = []
+        try:
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                for annot in page.annots():
+                    if annot.type[0] == 8:  # 8 és Highlight a PyMuPDF
+                        quads = annot.vertices
+                        text_parts = []
+                        if quads and len(quads) >= 4:
+                            for i in range(0, len(quads), 4):
+                                r = fitz.Quad(quads[i:i+4]).rect
+                                t = page.get_text("text", clip=r).replace("\n", " ").strip()
+                                if t:
+                                    text_parts.append(t)
+                        if not text_parts:
+                            t = page.get_text("text", clip=annot.rect).replace("\n", " ").strip()
+                            if t:
+                                text_parts.append(t)
+
+                        clean_text = " ".join(text_parts).strip()
+                        clean_text = re.sub(r'\s+', ' ', clean_text)
+                        if clean_text:
+                            highlights.append({
+                                "page": page_num + 1,
+                                "text": clean_text,
+                                "rect": [annot.rect.x0, annot.rect.y0, annot.rect.x1, annot.rect.y1]
+                            })
+        finally:
+            doc.close()
         return {
             "status": "ok",
             "pdf": clean_name,
@@ -1352,46 +1429,12 @@ async def plec_extract_highlights(pdf: str = Query(..., description="Nom o ruta 
         }
 
     try:
-        import fitz
-        doc = fitz.open(str(target_pdf))
-        highlights = []
-        for page_num in range(len(doc)):
-            page = doc[page_num]
-            for annot in page.annots():
-                if annot.type[0] == 8:  # 8 és Highlight a PyMuPDF
-                    quads = annot.vertices
-                    text_parts = []
-                    if quads and len(quads) >= 4:
-                        for i in range(0, len(quads), 4):
-                            r = fitz.Quad(quads[i:i+4]).rect
-                            t = page.get_text("text", clip=r).replace("\n", " ").strip()
-                            if t:
-                                text_parts.append(t)
-                    if not text_parts:
-                        t = page.get_text("text", clip=annot.rect).replace("\n", " ").strip()
-                        if t:
-                            text_parts.append(t)
-
-                    clean_text = " ".join(text_parts).strip()
-                    clean_text = re.sub(r'\s+', ' ', clean_text)
-                    if clean_text:
-                        highlights.append({
-                            "page": page_num + 1,
-                            "text": clean_text,
-                            "rect": [annot.rect.x0, annot.rect.y0, annot.rect.x1, annot.rect.y1]
-                        })
-        doc.close()
-        return {
-            "status": "ok",
-            "pdf": clean_name,
-            "total": len(highlights),
-            "highlights": highlights
-        }
+        return await asyncio.to_thread(_extreure_sync)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error extreient subratllats: {e}")
 
-@router.post("/plec/create-companion-note")
-async def plec_create_companion_note(req: PlecCompanionNoteRequest):
+@router.post("/faristol/create-companion-note")
+async def faristol_create_companion_note(req: FaristolCompanionNoteRequest):
     """Crea una nota associada a un PDF existent si encara no en té."""
     real_pdf = _document_segur(req.pdf)
     stem = real_pdf.stem
@@ -1444,8 +1487,8 @@ pdf: "{real_pdf.name}"
         escriure_atomic(nota_path, contingut)
     return {"status": "created", "note": nota_name, "message": "Nota creada correctament"}
 
-@router.post("/plec/upload-pdf")
-async def plec_upload_pdf(request: Request, filename: str = Query(..., description="Nom del fitxer PDF")):
+@router.post("/faristol/upload-pdf")
+async def faristol_upload_pdf(request: Request, filename: str = Query(..., description="Nom del fitxer PDF")):
     """Puja un PDF, el desa a FONTS_DIR, n'extrau metadades i crea la seua nota Markdown associada de forma segura."""
     content = await request.body()
     if not content or not content.startswith(b"%PDF"):
@@ -1529,21 +1572,13 @@ pdf: "{clean_name}"
         "message": f"PDF {clean_name} ingerit i nota {nota_name} creada"
     }
 
-@router.post("/plec/ingest-url")
-async def plec_ingest_url(req: PlecIngestUrlRequest):
-    """Descarrega un PDF d'un enllaç URL amb protecció contra SSRF i escriptura atòmica."""
-    import urllib.request
-    url = req.url.strip()
-    if not url:
-        raise HTTPException(status_code=400, detail="URL buida")
-
-    parsed = urllib.parse.urlparse(url)
+def _validar_host_ssrf(url_str: str) -> urllib.parse.ParseResult:
+    """Valida l'esquema d'una URL i comprova que cap IP resolta apunti a xarxes privades o locals."""
+    parsed = urllib.parse.urlparse(url_str)
     if parsed.scheme.lower() not in ("http", "https"):
         raise HTTPException(status_code=400, detail="Només es permeten URLs http:// o https:// (esquemes com file:// estan prohibits)")
     if not parsed.hostname:
         raise HTTPException(status_code=400, detail="Nom d'amfitrió invàlid")
-
-    # Protecció estricta contra SSRF: resolució DNS i comprovació d'adreces IP internes
     try:
         addr_info = socket.getaddrinfo(parsed.hostname, None)
         for addr in addr_info:
@@ -1552,8 +1587,25 @@ async def plec_ingest_url(req: PlecIngestUrlRequest):
                 raise HTTPException(status_code=400, detail="Accés denegat: la URL apunta a una IP de xarxa privada o reservada")
     except socket.gaierror:
         raise HTTPException(status_code=400, detail="No s'ha pogut resoldre el nom d'amfitrió de la URL")
+    return parsed
 
-    try:
+@router.post("/faristol/ingest-url")
+async def faristol_ingest_url(req: FaristolIngestUrlRequest):
+    """Descarrega un PDF d'un enllaç URL amb protecció contra SSRF (incloent redireccions) i escriptura atòmica."""
+    import urllib.request
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL buida")
+
+    def _ingest_sync() -> dict:
+        parsed = _validar_host_ssrf(url)
+
+        class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req_redir, fp, code, msg, headers, newurl):
+                full_new = urllib.parse.urljoin(req_redir.full_url, newurl)
+                _validar_host_ssrf(full_new)
+                return super().redirect_request(req_redir, fp, code, msg, headers, full_new)
+
         path_leaf = Path(parsed.path).name
         if not path_leaf or not path_leaf.lower().endswith(".pdf"):
             path_leaf = f"document_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -1570,9 +1622,10 @@ async def plec_ingest_url(req: PlecIngestUrlRequest):
 
         req_headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"}
         request_obj = urllib.request.Request(url, headers=req_headers)
-        
+        opener = urllib.request.build_opener(_SafeRedirectHandler)
+
         MAX_SIZE = 100 * 1024 * 1024  # 100 MB màxim
-        with urllib.request.urlopen(request_obj, timeout=30) as response:
+        with opener.open(request_obj, timeout=30) as response:
             content = response.read(MAX_SIZE + 1)
             if len(content) > MAX_SIZE:
                 raise HTTPException(status_code=400, detail="El fitxer supera el límit permès de 100 MB")
@@ -1607,7 +1660,7 @@ date: {avui}
 tags: ["web", "lectura"]
 citekey: "@{clean_stem}"
 pdf: "{clean_name}"
-url: "{url}"
+url: {json.dumps(url, ensure_ascii=False)}
 ---
 
 # {titol}
@@ -1635,6 +1688,9 @@ url: "{url}"
             "title": titol,
             "pages": num_pagines
         }
+
+    try:
+        return await asyncio.to_thread(_ingest_sync)
     except HTTPException:
         raise
     except Exception as e:
@@ -1645,223 +1701,251 @@ url: "{url}"
 # 6. COL·LECCIONS VIRTUALS
 # =====================================================================
 
-def _carregar_colleccions() -> dict:
-    with bloqueig(COLLECTIONS_FILE):
-        data = llegir_json_segur(COLLECTIONS_FILE, {"collections": []})
-        if not isinstance(data, dict) or "collections" not in data:
-            return {"collections": []}
-        return data
+def _llegir_colleccions_nolock() -> dict:
+    data = llegir_json_segur(COLLECTIONS_FILE, {"collections": []})
+    if not isinstance(data, dict) or "collections" not in data:
+        return {"collections": []}
+    return data
 
-def _desar_colleccions(dades: dict):
-    with bloqueig(COLLECTIONS_FILE):
-        escriure_atomic(COLLECTIONS_FILE, json.dumps(dades, indent=2, ensure_ascii=False))
+def _escriure_colleccions_nolock(dades: dict):
+    escriure_atomic(COLLECTIONS_FILE, json.dumps(dades, indent=2, ensure_ascii=False))
+
+def _notificar_kate_sync():
     try:
         subprocess.Popen(["kate-sync-project", "--quiet"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 
-@router.get("/plec/collections")
+def _carregar_colleccions() -> dict:
+    with bloqueig(COLLECTIONS_FILE):
+        return _llegir_colleccions_nolock()
+
+def _desar_colleccions(dades: dict):
+    with bloqueig(COLLECTIONS_FILE):
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
+
 @router.get("/collections")
-async def get_plec_collections():
-    """Retorna l'arbre de col·leccions virtuals de Plec (assegurant la sincronització de PDFs associats a notes)."""
-    dades = _carregar_colleccions()
+@router.get("/faristol/collections")
+async def obtenir_colleccions():
+    """Retorna l'arbre de col·leccions virtuals de Faristol (assegurant la sincronització de PDFs associats a notes)."""
     modificat = False
-    for col in dades.get("collections", []):
-        if "notes" not in col:
-            col["notes"] = []
-        if "pdfs" not in col:
-            col["pdfs"] = []
-        for n in col["notes"]:
-            for p in obtenir_pdfs_associats_nota(n):
-                if p not in col["pdfs"]:
-                    col["pdfs"].append(p)
-                    modificat = True
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        for col in dades.get("collections", []):
+            if "notes" not in col:
+                col["notes"] = []
+            if "pdfs" not in col:
+                col["pdfs"] = []
+            for n in col["notes"]:
+                for p in obtenir_pdfs_associats_nota(n):
+                    if p not in col["pdfs"]:
+                        col["pdfs"].append(p)
+                        modificat = True
+        if modificat:
+            _escriure_colleccions_nolock(dades)
     if modificat:
-        _desar_colleccions(dades)
+        _notificar_kate_sync()
     return dades
 
-@router.post("/plec/collections")
 @router.post("/collections")
-async def save_plec_collections(req: GuardarColleccionsRequest):
+@router.post("/faristol/collections")
+async def guardar_colleccions(req: GuardarColleccionsRequest):
     """Guarda l'estat complet de les col·leccions."""
     data = {"collections": req.collections}
     _desar_colleccions(data)
     return {"status": "ok", "collections": req.collections}
 
-@router.post("/plec/collections/create")
-async def create_plec_collection(req: NovaColleccioRequest):
-    """Crea una nova col·lecció virtual."""
-    dades = _carregar_colleccions()
-    import time
-    col_id = f"col_{int(time.time() * 1000)}"
-    nova = {
-        "id": col_id,
-        "name": req.name.strip(),
-        "parent_id": req.parent_id if req.parent_id else None,
-        "icon": req.icon or "fa-folder",
-        "notes": [],
-        "pdfs": [],
-        "created_at": datetime.now().isoformat()
-    }
-    dades["collections"].append(nova)
-    _desar_colleccions(dades)
+@router.post("/collections/create")
+@router.post("/faristol/collections/create")
+async def crear_colleccio(req: NovaColleccioRequest):
+    """Crea una nova col·lecció virtual de forma atòmica."""
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        col_id = f"col_{int(time.time() * 1000)}"
+        nova = {
+            "id": col_id,
+            "name": req.name.strip(),
+            "parent_id": req.parent_id if req.parent_id else None,
+            "icon": req.icon or "fa-folder",
+            "notes": [],
+            "pdfs": [],
+            "created_at": datetime.now().isoformat()
+        }
+        dades["collections"].append(nova)
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
     return {"status": "ok", "collection": nova}
 
-@router.put("/plec/collections/{col_id}")
-async def update_plec_collection(col_id: str, req: ActualitzarColleccioRequest):
-    """Actualitza el nom o el pare d'una col·lecció."""
-    dades = _carregar_colleccions()
-    trobat = False
-    for col in dades["collections"]:
-        if col.get("id") == col_id:
-            if req.name is not None:
-                col["name"] = req.name.strip()
-            if req.parent_id is not None:
-                col["parent_id"] = req.parent_id if req.parent_id != "" else None
-            if req.icon is not None:
-                col["icon"] = req.icon
-            trobat = True
-            break
-    if not trobat:
-        raise HTTPException(status_code=404, detail="Col·lecció no trobada")
-    _desar_colleccions(dades)
+@router.put("/collections/{col_id}")
+@router.put("/faristol/collections/{col_id}")
+async def actualitzar_colleccio(col_id: str, req: ActualitzarColleccioRequest):
+    """Actualitza el nom o el pare d'una col·lecció de forma atòmica."""
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        trobat = False
+        for col in dades["collections"]:
+            if col.get("id") == col_id:
+                if req.name is not None:
+                    col["name"] = req.name.strip()
+                if req.parent_id is not None:
+                    col["parent_id"] = req.parent_id if req.parent_id != "" else None
+                if req.icon is not None:
+                    col["icon"] = req.icon
+                trobat = True
+                break
+        if not trobat:
+            raise HTTPException(status_code=404, detail="Col·lecció no trobada")
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
     return {"status": "ok", "col_id": col_id}
 
-@router.delete("/plec/collections/{col_id}")
-async def delete_plec_collection(col_id: str):
+@router.delete("/collections/{col_id}")
+@router.delete("/faristol/collections/{col_id}")
+async def eliminar_colleccio(col_id: str):
     """Elimina una col·lecció virtual sense tocar els fitxers de disc."""
-    dades = _carregar_colleccions()
-    nova_llista = []
-    parent_of_deleted = None
-    for col in dades["collections"]:
-        if col.get("id") == col_id:
-            parent_of_deleted = col.get("parent_id")
-        else:
-            nova_llista.append(col)
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        nova_llista = []
+        parent_of_deleted = None
+        for col in dades["collections"]:
+            if col.get("id") == col_id:
+                parent_of_deleted = col.get("parent_id")
+            else:
+                nova_llista.append(col)
 
-    for col in nova_llista:
-        if col.get("parent_id") == col_id:
-            col["parent_id"] = parent_of_deleted
+        for col in nova_llista:
+            if col.get("parent_id") == col_id:
+                col["parent_id"] = parent_of_deleted
 
-    dades["collections"] = nova_llista
-    _desar_colleccions(dades)
+        dades["collections"] = nova_llista
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
     return {"status": "ok", "deleted": col_id}
 
-@router.post("/plec/collections/{col_id}/add-item")
-async def add_item_to_collection(col_id: str, req: ItemColleccioRequest):
+@router.post("/collections/{col_id}/add-item")
+@router.post("/faristol/collections/{col_id}/add-item")
+async def afegir_item_colleccio(col_id: str, req: ItemColleccioRequest):
     """Afegeix una nota o PDF a una col·lecció (i sincronitza automàticament els fitxers associats)."""
-    dades = _carregar_colleccions()
-    col = next((c for c in dades["collections"] if c.get("id") == col_id), None)
-    if not col:
-        raise HTTPException(status_code=404, detail="Col·lecció no trobada")
+    assoc_pdfs = obtenir_pdfs_associats_nota(req.filename) if req.type == "note" else []
+    assoc_notes = obtenir_notes_associades_pdf(req.filename) if req.type != "note" else []
 
-    if "notes" not in col:
-        col["notes"] = []
-    if "pdfs" not in col:
-        col["pdfs"] = []
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        col = next((c for c in dades["collections"] if c.get("id") == col_id), None)
+        if not col:
+            raise HTTPException(status_code=404, detail="Col·lecció no trobada")
 
-    if req.type == "note":
-        if req.filename not in col["notes"]:
-            col["notes"].append(req.filename)
-        # Sincronitzar PDF(s) associat(s) a la nota
-        for p in obtenir_pdfs_associats_nota(req.filename):
-            if p not in col["pdfs"]:
-                col["pdfs"].append(p)
-    else:
-        if req.filename not in col["pdfs"]:
-            col["pdfs"].append(req.filename)
-        # Sincronitzar nota associada al PDF si existeix
-        for n in obtenir_notes_associades_pdf(req.filename):
-            if n not in col["notes"]:
-                col["notes"].append(n)
+        if "notes" not in col:
+            col["notes"] = []
+        if "pdfs" not in col:
+            col["pdfs"] = []
 
-    _desar_colleccions(dades)
+        if req.type == "note":
+            if req.filename not in col["notes"]:
+                col["notes"].append(req.filename)
+            for p in assoc_pdfs:
+                if p not in col["pdfs"]:
+                    col["pdfs"].append(p)
+        else:
+            if req.filename not in col["pdfs"]:
+                col["pdfs"].append(req.filename)
+            for n in assoc_notes:
+                if n not in col["notes"]:
+                    col["notes"].append(n)
+
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
     return {"status": "ok", "collection": col}
 
-@router.post("/plec/collections/{col_id}/remove-item")
-async def remove_item_from_collection(col_id: str, req: ItemColleccioRequest):
+@router.post("/collections/{col_id}/remove-item")
+@router.post("/faristol/collections/{col_id}/remove-item")
+async def treure_item_colleccio(col_id: str, req: ItemColleccioRequest):
     """Elimina una nota o PDF d'una col·lecció virtual."""
-    dades = _carregar_colleccions()
-    col = next((c for c in dades["collections"] if c.get("id") == col_id), None)
-    if not col:
-        raise HTTPException(status_code=404, detail="Col·lecció no trobada")
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        col = next((c for c in dades["collections"] if c.get("id") == col_id), None)
+        if not col:
+            raise HTTPException(status_code=404, detail="Col·lecció no trobada")
 
-    if "notes" not in col:
-        col["notes"] = []
-    if "pdfs" not in col:
-        col["pdfs"] = []
+        if "notes" not in col:
+            col["notes"] = []
+        if "pdfs" not in col:
+            col["pdfs"] = []
 
-    if req.type == "note":
-        if req.filename in col["notes"]:
-            col["notes"].remove(req.filename)
-            # Eliminar PDFs associats només si cap altra nota de la carpeta els necessita
-            associated_pdfs = obtenir_pdfs_associats_nota(req.filename)
-            other_pdfs = set()
-            for other_n in col.get("notes", []):
-                for p in obtenir_pdfs_associats_nota(other_n):
-                    other_pdfs.add(p)
-            for p in associated_pdfs:
-                if p not in other_pdfs and p in col["pdfs"]:
-                    col["pdfs"].remove(p)
-    else:
-        if req.filename in col["pdfs"]:
-            col["pdfs"].remove(req.filename)
+        if req.type == "note":
+            if req.filename in col["notes"]:
+                col["notes"].remove(req.filename)
+                associated_pdfs = obtenir_pdfs_associats_nota(req.filename)
+                other_pdfs = set()
+                for other_n in col.get("notes", []):
+                    for p in obtenir_pdfs_associats_nota(other_n):
+                        other_pdfs.add(p)
+                for p in associated_pdfs:
+                    if p not in other_pdfs and p in col["pdfs"]:
+                        col["pdfs"].remove(p)
+        else:
+            if req.filename in col["pdfs"]:
+                col["pdfs"].remove(req.filename)
 
-    _desar_colleccions(dades)
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
     return {"status": "ok", "collection": col}
 
-@router.post("/plec/collections/set-item-collections")
-async def set_item_collections(req: SetItemCollectionsRequest):
+@router.post("/collections/set-item-collections")
+@router.post("/faristol/collections/set-item-collections")
+async def assignar_colleccions_item(req: SetItemCollectionsRequest):
     """Assigna una nota o PDF exactament a les col·leccions indicades."""
-    dades = _carregar_colleccions()
     target_ids = set(req.collection_ids)
+    associated_pdfs = obtenir_pdfs_associats_nota(req.filename) if req.type == "note" else []
+    associated_notes = obtenir_notes_associades_pdf(req.filename) if req.type != "note" else []
 
-    if req.type == "note":
-        associated_pdfs = obtenir_pdfs_associats_nota(req.filename)
-        for col in dades["collections"]:
-            cid = col.get("id")
-            if "notes" not in col:
-                col["notes"] = []
-            if "pdfs" not in col:
-                col["pdfs"] = []
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        if req.type == "note":
+            for col in dades["collections"]:
+                cid = col.get("id")
+                if "notes" not in col:
+                    col["notes"] = []
+                if "pdfs" not in col:
+                    col["pdfs"] = []
 
-            if cid in target_ids:
-                if req.filename not in col["notes"]:
-                    col["notes"].append(req.filename)
-                for p in associated_pdfs:
-                    if p not in col["pdfs"]:
-                        col["pdfs"].append(p)
-            else:
-                if req.filename in col["notes"]:
-                    col["notes"].remove(req.filename)
-                    # Treure PDFs associats si cap altra nota de la carpeta els requereix
-                    other_pdfs = set()
-                    for other_n in col.get("notes", []):
-                        for p in obtenir_pdfs_associats_nota(other_n):
-                            other_pdfs.add(p)
+                if cid in target_ids:
+                    if req.filename not in col["notes"]:
+                        col["notes"].append(req.filename)
                     for p in associated_pdfs:
-                        if p not in other_pdfs and p in col["pdfs"]:
-                            col["pdfs"].remove(p)
-    else:
-        associated_notes = obtenir_notes_associades_pdf(req.filename)
-        for col in dades["collections"]:
-            cid = col.get("id")
-            if "notes" not in col:
-                col["notes"] = []
-            if "pdfs" not in col:
-                col["pdfs"] = []
+                        if p not in col["pdfs"]:
+                            col["pdfs"].append(p)
+                else:
+                    if req.filename in col["notes"]:
+                        col["notes"].remove(req.filename)
+                        other_pdfs = set()
+                        for other_n in col.get("notes", []):
+                            for p in obtenir_pdfs_associats_nota(other_n):
+                                other_pdfs.add(p)
+                        for p in associated_pdfs:
+                            if p not in other_pdfs and p in col["pdfs"]:
+                                col["pdfs"].remove(p)
+        else:
+            for col in dades["collections"]:
+                cid = col.get("id")
+                if "notes" not in col:
+                    col["notes"] = []
+                if "pdfs" not in col:
+                    col["pdfs"] = []
 
-            if cid in target_ids:
-                if req.filename not in col["pdfs"]:
-                    col["pdfs"].append(req.filename)
-                for n in associated_notes:
-                    if n not in col["notes"]:
-                        col["notes"].append(n)
-            else:
-                if req.filename in col["pdfs"]:
-                    col["pdfs"].remove(req.filename)
+                if cid in target_ids:
+                    if req.filename not in col["pdfs"]:
+                        col["pdfs"].append(req.filename)
+                    for n in associated_notes:
+                        if n not in col["notes"]:
+                            col["notes"].append(n)
+                else:
+                    if req.filename in col["pdfs"]:
+                        col["pdfs"].remove(req.filename)
 
-    _desar_colleccions(dades)
+        _escriure_colleccions_nolock(dades)
+    _notificar_kate_sync()
     return {
         "status": "ok",
         "filename": req.filename,
@@ -1869,82 +1953,73 @@ async def set_item_collections(req: SetItemCollectionsRequest):
         "collections_data": dades["collections"]
     }
 
-@router.post("/plec/collections/{col_id}/sync-notebooklm")
-async def sync_collection_notebooklm(col_id: str):
-    """Crea o sincronitza un quadern de NotebookLM per a la col·lecció virtual."""
-    dades = _carregar_colleccions()
-    col = next((c for c in dades.get("collections", []) if c.get("id") == col_id), None)
-    if not col:
-        raise HTTPException(status_code=404, detail="Col·lecció no trobada")
-
-    # Assegurar que qualsevol PDF associat a les notes de la col·lecció està inclòs a col["pdfs"]
-    if "pdfs" not in col:
-        col["pdfs"] = []
+@router.post("/collections/{col_id}/sync-notebooklm")
+@router.post("/faristol/collections/{col_id}/sync-notebooklm")
+async def sincronitzar_colleccio_notebooklm(col_id: str):
+    """Crea o sincronitza un quadern de NotebookLM per a la col·lecció virtual amb validació estricta de rutes."""
     modificat = False
-    for n in col.get("notes", []):
-        for p in obtenir_pdfs_associats_nota(n):
-            if p not in col["pdfs"]:
-                col["pdfs"].append(p)
-                modificat = True
+    with bloqueig(COLLECTIONS_FILE):
+        dades = _llegir_colleccions_nolock()
+        col = next((c for c in dades.get("collections", []) if c.get("id") == col_id), None)
+        if not col:
+            raise HTTPException(status_code=404, detail="Col·lecció no trobada")
+
+        if "pdfs" not in col:
+            col["pdfs"] = []
+        for n in col.get("notes", []):
+            for p in obtenir_pdfs_associats_nota(n):
+                if p not in col["pdfs"]:
+                    col["pdfs"].append(p)
+                    modificat = True
+        if modificat:
+            _escriure_colleccions_nolock(dades)
+
+        col_name = col.get("name", "").strip()
+        pdf_list = list(col.get("pdfs", []))
+        notebook_id = col.get("notebook_id")
+
     if modificat:
-        _desar_colleccions(dades)
-
-
-    col_name = col.get("name", "").strip()
-    pdf_list = col.get("pdfs", [])
-    notebook_id = col.get("notebook_id")
-
-    async def run_nlm(*args):
-        nlm_bin = shutil.which("nlm") or "/home/casimir/.local/bin/nlm"
-        proc = await asyncio.create_subprocess_exec(
-            nlm_bin, *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await proc.communicate()
-        return proc.returncode == 0, stdout.decode().strip(), stderr.decode().strip()
+        _notificar_kate_sync()
 
     # Si no té quadern, crear-lo
     if not notebook_id:
-        ok, out, err = await run_nlm("notebook", "create", col_name, "--json")
+        ok, out, data = await _exec_nlm_cli(["notebook", "create", col_name, "--json"], parse_json=True)
         if not ok:
-            ok, out, err = await run_nlm("create", "notebook", col_name, "--json")
-        if ok:
-            try:
-                data = json.loads(out)
-                notebook_id = data.get("id") or data.get("notebook_id")
-                if notebook_id:
-                    fresh_dades = _carregar_colleccions()
+            ok, out, data = await _exec_nlm_cli(["create", "notebook", col_name, "--json"], parse_json=True)
+        if ok and isinstance(data, dict):
+            notebook_id = data.get("id") or data.get("notebook_id")
+            if notebook_id:
+                with bloqueig(COLLECTIONS_FILE):
+                    fresh_dades = _llegir_colleccions_nolock()
                     for c_item in fresh_dades.get("collections", []):
                         if c_item.get("id") == col_id:
                             c_item["notebook_id"] = notebook_id
                             break
-                    _desar_colleccions(fresh_dades)
-            except Exception:
-                pass
+                    _escriure_colleccions_nolock(fresh_dades)
+                _notificar_kate_sync()
 
-    if not notebook_id:
+    if not notebook_id or str(notebook_id).startswith("-"):
         raise HTTPException(status_code=500, detail="No s'ha pogut crear o associar el quadern de NotebookLM")
 
     # Obtenir fonts ja presents
-    ok, out, _ = await run_nlm("source", "list", notebook_id, "--json")
+    ok, _, src_list = await _exec_nlm_cli(["source", "list", str(notebook_id), "--json"], parse_json=True)
     existing_titles = set()
-    if ok:
-        try:
-            src_list = json.loads(out)
-            for s in src_list:
+    if ok and isinstance(src_list, list):
+        for s in src_list:
+            if isinstance(s, dict):
                 existing_titles.add(s.get("title", ""))
-        except Exception:
-            pass
 
-    # Pujar els PDFs nous
+    # Pujar els PDFs nous validant estrictament cada ruta amb _document_segur
     afegits = 0
     for pdf_name in pdf_list:
         if pdf_name in existing_titles:
             continue
-        p = FONTS_DIR / pdf_name
-        if p.exists():
-            ok_add, _, _ = await run_nlm("source", "add", notebook_id, "--file", str(p.resolve()))
+        try:
+            p = _document_segur(pdf_name)
+        except HTTPException:
+            continue
+        if p.is_file() and p.suffix.lower() == ".pdf":
+            ok_add, _, _ = await _exec_nlm_cli(["source", "add", str(notebook_id), "--file", str(p)], parse_json=False)
             if ok_add:
                 afegits += 1
 
@@ -1959,15 +2034,31 @@ async def sync_collection_notebooklm(col_id: str):
 # 7. NOTEBOOKLM IA RAG STUDIO
 # =====================================================================
 
-async def _exec_nlm_cli(args: List[str], parse_json: bool = True):
+def _validar_id_nlm(val: str, camp: str = "id") -> str:
+    net = (val or "").strip()
+    if not net or net.startswith("-") or "\x00" in net:
+        raise HTTPException(status_code=400, detail=f"Paràmetre '{camp}' no vàlid")
+    return net
+
+async def _exec_nlm_cli(args: List[str], parse_json: bool = True, timeout: float = 90.0):
     nlm_bin = shutil.which("nlm") or "/home/casimir/.local/bin/nlm"
+    proc = None
     try:
         proc = await asyncio.create_subprocess_exec(
             nlm_bin, *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await proc.communicate()
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        except asyncio.TimeoutError:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+            return False, f"Temps d'espera esgotat ({int(timeout)}s) executant 'nlm'.", None
+
         stdout_str = stdout.decode("utf-8", errors="replace").strip()
         stderr_str = stderr.decode("utf-8", errors="replace").strip()
 
@@ -2000,6 +2091,14 @@ async def _exec_nlm_cli(args: List[str], parse_json: bool = True):
             except Exception as e:
                 return False, f"Error parsejant JSON de nlm ({e}):\n{stdout_str}", None
         return True, stdout_str, stdout_str
+    except asyncio.CancelledError:
+        if proc and proc.returncode is None:
+            try:
+                proc.kill()
+                await proc.wait()
+            except Exception:
+                pass
+        raise
     except FileNotFoundError:
         return False, "La comanda 'nlm' (NotebookLM CLI) no està instal·lada o no és al PATH.", None
     except Exception as e:
@@ -2018,28 +2117,35 @@ async def nlm_llistar_quaderns():
 @router.get("/nlm/sources")
 async def nlm_llistar_fonts(notebook_id: str = Query(...)):
     """Llista les fonts documentals d'un quadern concret de NotebookLM."""
-    ok, text, data = await _exec_nlm_cli(["source", "list", notebook_id, "--json"], parse_json=True)
+    nb_id = _validar_id_nlm(notebook_id, "notebook_id")
+    ok, text, data = await _exec_nlm_cli(["source", "list", nb_id, "--json"], parse_json=True)
     if not ok:
         raise HTTPException(status_code=500, detail=text)
-    return {"notebook_id": notebook_id, "sources": data}
+    return {"notebook_id": nb_id, "sources": data}
 
 @router.post("/nlm/query")
 async def nlm_consultar(req: NlmQueryRequest):
     """Executa una consulta RAG contra un quadern o font de NotebookLM."""
-    args = ["query", "notebook", req.notebook_id, req.query, "--json"]
-    if req.conversation_id:
-        args.extend(["-c", req.conversation_id])
-    if req.source_ids and len(req.source_ids) > 0:
-        args.extend(["-s", ",".join(req.source_ids)])
-    elif req.source_id:
-        args.extend(["-s", req.source_id])
+    nb_id = _validar_id_nlm(req.notebook_id, "notebook_id")
+    query_clean = (req.query or "").strip()
+    if not query_clean or query_clean.startswith("-"):
+        raise HTTPException(status_code=400, detail="La consulta no pot estar buida ni començar per '-'")
 
-    ok, text, data = await _exec_nlm_cli(args, parse_json=True)
+    args = ["query", "notebook", nb_id, query_clean, "--json"]
+    if req.conversation_id:
+        args.extend(["-c", _validar_id_nlm(req.conversation_id, "conversation_id")])
+    if req.source_ids and len(req.source_ids) > 0:
+        clean_sids = [_validar_id_nlm(s, "source_id") for s in req.source_ids]
+        args.extend(["-s", ",".join(clean_sids)])
+    elif req.source_id:
+        args.extend(["-s", _validar_id_nlm(req.source_id, "source_id")])
+
+    ok, text, data = await _exec_nlm_cli(args, parse_json=True, timeout=120.0)
     if not ok:
         raise HTTPException(status_code=500, detail=text)
 
     sources_map = {}
-    ok_src, _, src_data = await _exec_nlm_cli(["source", "list", req.notebook_id, "--json"], parse_json=True)
+    ok_src, _, src_data = await _exec_nlm_cli(["source", "list", nb_id, "--json"], parse_json=True)
     if ok_src and isinstance(src_data, list):
         for s in src_data:
             s_id = s.get("id")
@@ -2056,78 +2162,82 @@ async def nlm_consultar(req: NlmQueryRequest):
     citations = data.get("citations", {}) if isinstance(data, dict) else {}
     references = data.get("references", []) if isinstance(data, dict) else []
 
-    # Resolució de pàgina exacta mitjançant PyMuPDF
-    citation_details = {}
-    opened_docs = {}
-    try:
-        import fitz
-        for ref in references:
-            c_num = str(ref.get("citation_number", ""))
-            s_id = ref.get("source_id", "")
-            cited_text = ref.get("cited_text", "")
-            src_info = sources_map.get(s_id, {})
-            title = src_info.get("title", "")
-            citekey = src_info.get("citekey", "")
+    def _resoldre_pagines_sync() -> dict:
+        citation_details = {}
+        opened_docs = {}
+        try:
+            import fitz
+            for ref in references:
+                c_num = str(ref.get("citation_number", ""))
+                s_id = ref.get("source_id", "")
+                cited_text = ref.get("cited_text", "")
+                src_info = sources_map.get(s_id, {})
+                title = src_info.get("title", "")
+                citekey = src_info.get("citekey", "")
 
-            page_num = 1
-            if title:
-                target_pdf = None
-                for p_cand in [FONTS_DIR / title, NOTAS_DIR / title, FONTS_DIR / f"{title}.pdf", NOTAS_DIR / f"{title}.pdf"]:
-                    if p_cand.exists() and p_cand.is_file():
-                        target_pdf = p_cand
-                        break
-                if not target_pdf:
-                    target_stem = Path(title).stem.lower()
-                    for cand in FONTS_DIR.glob("*.pdf"):
-                        if cand.stem.lower() == target_stem:
-                            target_pdf = cand
+                page_num = 1
+                if title:
+                    target_pdf = None
+                    clean_title_leaf = Path(title).name
+                    for p_cand in [FONTS_DIR / clean_title_leaf, NOTAS_DIR / clean_title_leaf, FONTS_DIR / f"{clean_title_leaf}.pdf", NOTAS_DIR / f"{clean_title_leaf}.pdf"]:
+                        if p_cand.exists() and p_cand.is_file():
+                            target_pdf = p_cand
                             break
+                    if not target_pdf:
+                        target_stem = Path(clean_title_leaf).stem.lower()
+                        for cand in FONTS_DIR.glob("*.pdf"):
+                            if cand.stem.lower() == target_stem:
+                                target_pdf = cand
+                                break
 
-                if target_pdf:
-                    try:
-                        doc = opened_docs.get(str(target_pdf))
-                        if not doc:
-                            doc = fitz.open(str(target_pdf))
-                            opened_docs[str(target_pdf)] = doc
+                    if target_pdf:
+                        try:
+                            doc = opened_docs.get(str(target_pdf))
+                            if not doc:
+                                doc = fitz.open(str(target_pdf))
+                                opened_docs[str(target_pdf)] = doc
 
-                        if cited_text:
-                            clean_cite = re.sub(r'[-\s]+', ' ', cited_text).lower().strip()
-                            words = [w for w in clean_cite.split() if len(w) > 2]
-                            chunks = [' '.join(words[i:i+4]) for i in range(0, min(len(words)-3, 16), 2)]
-                            found = False
-                            for p_idx in range(len(doc)):
-                                p_text = re.sub(r'[-\s]+', ' ', doc[p_idx].get_text()).lower()
-                                for chunk in chunks:
-                                    if chunk in p_text:
-                                        page_num = p_idx + 1
-                                        found = True
+                            if cited_text:
+                                clean_cite = re.sub(r'[-\s]+', ' ', cited_text).lower().strip()
+                                words = [w for w in clean_cite.split() if len(w) > 2]
+                                chunks = [' '.join(words[i:i+4]) for i in range(0, min(len(words)-3, 16), 2)]
+                                found = False
+                                for p_idx in range(len(doc)):
+                                    p_text = re.sub(r'[-\s]+', ' ', doc[p_idx].get_text()).lower()
+                                    for chunk in chunks:
+                                        if chunk in p_text:
+                                            page_num = p_idx + 1
+                                            found = True
+                                            break
+                                    if found:
                                         break
-                                if found:
-                                    break
-                    except Exception as err_fitz:
-                        logger.warning(f"Avís fitz cercant pàgina a {title}: {err_fitz}")
+                        except Exception as err_fitz:
+                            logger.warning(f"Avís fitz cercant pàgina a {title}: {err_fitz}")
 
-            ref["page"] = page_num
-            ref["citekey"] = citekey
-            ref["pdf"] = title
+                ref["page"] = page_num
+                ref["citekey"] = citekey
+                ref["pdf"] = title
 
-            if c_num:
-                citation_details[c_num] = {
-                    "source_id": s_id,
-                    "citation_number": c_num,
-                    "page": page_num,
-                    "citekey": citekey,
-                    "pdf": title,
-                    "cited_text": cited_text
-                }
-    except Exception as e_proc:
-        logger.warning(f"Avís resolent citacions NLM: {e_proc}")
-    finally:
-        for doc in opened_docs.values():
-            try:
-                doc.close()
-            except:
-                pass
+                if c_num:
+                    citation_details[c_num] = {
+                        "source_id": s_id,
+                        "citation_number": c_num,
+                        "page": page_num,
+                        "citekey": citekey,
+                        "pdf": title,
+                        "cited_text": cited_text
+                    }
+        except Exception as e_proc:
+            logger.warning(f"Avís resolent citacions NLM: {e_proc}")
+        finally:
+            for doc in opened_docs.values():
+                try:
+                    doc.close()
+                except Exception:
+                    pass
+        return citation_details
+
+    citation_details = await asyncio.to_thread(_resoldre_pagines_sync)
 
     return {
         "status": "ok",
@@ -2143,11 +2253,12 @@ async def nlm_consultar(req: NlmQueryRequest):
 @router.post("/nlm/sources/add")
 async def nlm_afegir_url(req: NlmAddUrlRequest):
     """Afegeix una URL com a nova font a un quadern de NotebookLM."""
+    nb_id = _validar_id_nlm(req.notebook_id, "notebook_id")
     url = req.url.strip()
     if not url.startswith("http://") and not url.startswith("https://"):
         raise HTTPException(status_code=400, detail="La URL ha de començar per http:// o https://")
 
-    ok, text, _ = await _exec_nlm_cli(["source", "add", req.notebook_id, "--url", url], parse_json=False)
+    ok, text, _ = await _exec_nlm_cli(["source", "add", nb_id, "--url", url], parse_json=False)
     if not ok:
         raise HTTPException(status_code=500, detail=text)
     return {"status": "ok", "message": text}
@@ -2155,12 +2266,14 @@ async def nlm_afegir_url(req: NlmAddUrlRequest):
 @router.post("/nlm/delete")
 async def nlm_esborrar_element(req: NlmDeleteRequest):
     """Esborra un quadern o una font de NotebookLM."""
+    item_id = _validar_id_nlm(req.item_id, "item_id")
     if req.target_type == "notebook":
-        args = ["notebook", "delete", req.item_id, "--yes"]
+        args = ["notebook", "delete", item_id, "--yes"]
     elif req.target_type == "source":
         if not req.notebook_id:
             raise HTTPException(status_code=400, detail="Cal el notebook_id per esborrar una font")
-        args = ["source", "delete", req.notebook_id, req.item_id, "--yes"]
+        nb_id = _validar_id_nlm(req.notebook_id, "notebook_id")
+        args = ["source", "delete", nb_id, item_id, "--yes"]
     else:
         raise HTTPException(status_code=400, detail="Tipus d'element no reconegut")
 

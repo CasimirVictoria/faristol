@@ -8205,7 +8205,7 @@ dialog :link{
   }
 }
 
-/* Plec: Assegurar visibilitat dels subratllats ISO de l'annotationLayer */
+/* Faristol: Assegurar visibilitat dels subratllats ISO de l'annotationLayer */
 .annotationLayer .highlightAnnotation {
   mix-blend-mode: multiply !important;
   opacity: 0.65 !important;

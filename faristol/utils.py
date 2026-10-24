@@ -19,10 +19,10 @@ def enviar_a_la_papelera(ruta: Path) -> bool:
         ["trash-put", str(ruta.resolve())]
     ]:
         try:
-            res = subprocess.run(cmd, capture_output=True)
+            res = subprocess.run(cmd, capture_output=True, timeout=5)
             if res.returncode == 0:
                 return True
-        except FileNotFoundError:
+        except (FileNotFoundError, subprocess.TimeoutExpired):
             continue
 
     try:
@@ -119,7 +119,16 @@ def detectar_tots_els_pdfs(fichero_nota: Path, text: str) -> List[Tuple[int, Pat
             p = Path(candidata)
             if not p.is_absolute() and fichero_nota:
                 p = (fichero_nota.parent / p).resolve()
+            else:
+                try:
+                    p = p.resolve()
+                except Exception:
+                    continue
             
+            from .config import FONTS_DIR, NOTAS_DIR
+            if not (p.is_relative_to(FONTS_DIR.resolve()) or p.is_relative_to(NOTAS_DIR.resolve())):
+                continue
+
             if p.exists() and p.is_file() and p.suffix.lower() in [".pdf", ".html"]:
                 if str(p) not in rutes_vistes:
                     rutes_vistes.add(str(p))
@@ -304,16 +313,19 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", abstract
             if not is_valid:
                 continue
 
+            from .fsatomic import bloqueig, escriure_atomic
             fname_clean = re.sub(r"[^a-zA-Z0-9]", "", _strip_accents(p.name).lower())
 
             # 1. Coincidència de nom amb DOI o PMID
             if (pmid and str(pmid) in fname_clean) or (doi_clean and len(doi_clean) > 4 and doi_clean in fname_clean):
-                shutil.copy2(p, target_path)
+                with bloqueig(target_path):
+                    escriure_atomic(target_path, p_bytes)
                 return True
 
             # 2. Coincidència de nom de fitxer amb el títol (ex: Dialnet-CreativityAndArtificialIntelligence...)
             if len(clean_main_title) >= 15 and clean_main_title[:20] in fname_clean:
-                shutil.copy2(p, target_path)
+                with bloqueig(target_path):
+                    escriure_atomic(target_path, p_bytes)
                 return True
 
             # 3. Coincidència estricta de frase al contingut de la primera pàgina
@@ -329,11 +341,13 @@ def check_and_import_from_downloads(target_path: Path, title: str = "", abstract
                         continue
 
                 if (clean_full_title and len(clean_full_title) >= 15 and clean_full_title in clean_pdf):
-                    shutil.copy2(p, target_path)
+                    with bloqueig(target_path):
+                        escriure_atomic(target_path, p_bytes)
                     return True
 
                 if (clean_main_title and len(clean_main_title) >= 20 and clean_main_title in clean_pdf):
-                    shutil.copy2(p, target_path)
+                    with bloqueig(target_path):
+                        escriure_atomic(target_path, p_bytes)
                     return True
         except Exception:
             continue
