@@ -2409,6 +2409,24 @@ function iniciarSincronitzacioBiblioteca() {
                     await recarregarSiCanvia();
                 } catch(err) {}
             });
+            sseSource.addEventListener('open-document', async (e) => {
+                try {
+                    const d = JSON.parse(e.data);
+                    if (d && d.doc) {
+                        let docName = d.doc;
+                        if (!docName.endsWith('.md') && !docName.endsWith('.org')) {
+                            docName = (docName.startsWith('@') ? docName : '@' + docName) + '.md';
+                        }
+                        await carregarNotes(true);
+                        await obrirNota(docName);
+                        try {
+                            history.replaceState(null, '', `/?doc=${encodeURIComponent(docName)}`);
+                        } catch(_) {}
+                    }
+                } catch(err) {
+                    console.error("Error en obrir document via SSE:", err);
+                }
+            });
             sseSource.onerror = () => {
                 if (sseSource) sseSource.close();
                 setTimeout(connectarSSE, 5000);

@@ -684,7 +684,18 @@ def get_library_signature() -> str:
 
     return f"{b_mtime:.3f}_{c_mtime:.3f}_{f_mtime:.3f}_{n_mtime:.3f}"
 
-library_change_event = asyncio.Event()
+class NotifyLibraryRequest(BaseModel):
+    doc: Optional[str] = None
+
+sse_subscribers: set[asyncio.Queue] = set()
+
+async def broadcast_sse_event(event_type: str, data: dict):
+    """Envia un esdeveniment a totes les pestanyes connectades per SSE."""
+    for q in list(sse_subscribers):
+        try:
+            q.put_nowait({"event": event_type, "data": data})
+        except Exception:
+            pass
 
 @router.get("/library/status")
 async def obtenir_estat_biblioteca():
@@ -697,39 +708,55 @@ async def obtenir_estat_biblioteca():
     }
 
 @router.post("/library/notify-change")
-async def notificar_canvi_biblioteca():
+async def notificar_canvi_biblioteca(req: Optional[NotifyLibraryRequest] = None):
     """Permet a zotero-receiver, add-paper o altres eines notificar canvis immediatament."""
-    library_change_event.set()
+    sig = get_library_signature()
+    payload = {"signature": sig, "event": "library-changed"}
+    if req and req.doc:
+        payload["doc"] = req.doc
+    await broadcast_sse_event("change", payload)
+    if req and req.doc:
+        await broadcast_sse_event("open-document", {"doc": req.doc})
     return {"status": "ok", "message": "Canvi notificat correctament"}
+
+@router.post("/library/open-document")
+async def obrir_document_remot(req: NotifyLibraryRequest):
+    """Demana a les pestanyes de Faristol que òbriguen un document immediatament."""
+    if not req or not req.doc:
+        raise HTTPException(status_code=400, detail="Cal especificar 'doc'")
+    await broadcast_sse_event("open-document", {"doc": req.doc})
+    return {"status": "ok", "doc": req.doc}
 
 @router.get("/library/events")
 async def stream_esdeveniments_biblioteca():
     """SSE (Server-Sent Events) per sincronitzar la interfície de Faristol a l'instant en segon pla."""
+    queue = asyncio.Queue()
+    sse_subscribers.add(queue)
+
     async def generador():
         last_sig = get_library_signature()
         yield f"event: connected\ndata: {json.dumps({'signature': last_sig})}\n\n"
-        while True:
-            try:
-                explicit_trigger = False
+        try:
+            while True:
                 try:
-                    await asyncio.wait_for(library_change_event.wait(), timeout=1.2)
-                    library_change_event.clear()
-                    explicit_trigger = True
+                    # Espera un esdeveniment específic per cua fins a 10 segons
+                    item = await asyncio.wait_for(queue.get(), timeout=10.0)
+                    evt_name = item.get("event", "change")
+                    evt_data = json.dumps(item.get("data", {}))
+                    yield f"event: {evt_name}\ndata: {evt_data}\n\n"
                 except asyncio.TimeoutError:
-                    pass
-
-                cur_sig = get_library_signature()
-                if explicit_trigger or cur_sig != last_sig:
-                    last_sig = cur_sig
-                    payload = json.dumps({"signature": cur_sig, "event": "library-changed"})
-                    yield f"event: change\ndata: {payload}\n\n"
-                else:
-                    yield ": ping\n\n"
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Error en stream SSE de biblioteca: {e}")
-                await asyncio.sleep(2.0)
+                    # Polling suau passiu cada 10 segons si hi ha hagut canvis sense notificar
+                    cur_sig = get_library_signature()
+                    if cur_sig != last_sig:
+                        last_sig = cur_sig
+                        payload = json.dumps({"signature": cur_sig, "event": "library-changed"})
+                        yield f"event: change\ndata: {payload}\n\n"
+                    else:
+                        yield ": ping\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            sse_subscribers.discard(queue)
 
     return StreamingResponse(
         generador(),
