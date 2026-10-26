@@ -385,11 +385,11 @@ async def esborrar_nota(filename: str):
         try:
             with bloqueig(BIB_FILE_PATH):
                 bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
-                patro_ent = re.compile(rf'(@\w+\s*\{{\s*{re.escape(citekey)}\s*,[\s\S]*?\n\}})(?=@|\Z)', re.MULTILINE)
+                patro_ent = re.compile(rf'(@\w+\s*\{{\s*{re.escape(citekey)}\s*,[\s\S]*?\n\s*\}})(?=\s*@|\s*\Z)', re.MULTILINE)
                 m_ent = patro_ent.search(bib_text)
                 if m_ent:
                     ent_original = m_ent.group(1)
-                    # Comentar cada línia amb % DELETED_TRASH
+                    # Comentar cada línia amb % TRASH:
                     ent_comentada = "\n".join(f"% TRASH: {line}" for line in ent_original.splitlines())
                     bib_nou = bib_text[:m_ent.start()] + ent_comentada + bib_text[m_ent.end():]
                     escriure_atomic(BIB_FILE_PATH, bib_nou, backup=True)
