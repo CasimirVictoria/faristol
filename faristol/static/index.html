@@ -2520,6 +2520,21 @@ function netejarVisorPdf() {
     if (pdfBadge) pdfBadge.style.display = 'none';
 }
 
+function netejarEditor() {
+    state.activeNoteFilename = null;
+    state.isDirty = false;
+    if (state.autoSaveTimeout) {
+        clearTimeout(state.autoSaveTimeout);
+        state.autoSaveTimeout = null;
+    }
+    if (el.editorNoteTitle) el.editorNoteTitle.textContent = 'Sense nota seleccionada';
+    if (el.editorBreadcrumb) el.editorBreadcrumb.textContent = '';
+    if (window.vditorInstance && window.vditorReady) {
+        window.vditorInstance.setValue('');
+    }
+    actualitzarEstatGuardat('saved', 'Cap nota activa');
+}
+
 function alternarDesplegableColleccions() {
     // Les carpetes estan permanentment visibles a la part superior
 }

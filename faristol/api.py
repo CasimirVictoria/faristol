@@ -584,10 +584,22 @@ async def buidar_paperera():
 
 @router.post("/trash/move-doc/{filename}")
 async def moure_document_paperera(filename: str):
-    """Mou un document orfe (PDF/HTML) a la Paperera de la biblioteca."""
+    """Mou un document (PDF/HTML) i la seua nota associada a la Paperera de la biblioteca."""
     src = FONTS_DIR / filename
     if not src.is_file():
         raise HTTPException(status_code=404, detail="Document no trobat")
+
+    stem = src.stem
+    cand_notes = [f"@{stem}.md", f"{stem}.md"]
+    note_found = None
+    for cand in cand_notes:
+        if (NOTAS_DIR / cand).is_file():
+            note_found = cand
+            break
+
+    # Si té nota associada, deleguem en esborrar_nota perquè mogui nota, docs i comenti bibtex
+    if note_found:
+        return await esborrar_nota(note_found)
 
     trash_docs_dir = PAPERERA_DIR / "documents"
     trash_docs_dir.mkdir(parents=True, exist_ok=True)
