@@ -24,6 +24,7 @@ from faristol.config import (
     NOTAS_DIR,
     FONTS_DIR,
     BIB_FILE_PATH,
+    PAPERERA_DIR,
     COLLECTIONS_FILE,
     HIGHLIGHTS_FILE
 )
@@ -329,15 +330,274 @@ async def guardar_nota(filename: str, req: GuardarNotaRequest):
 
 @router.delete("/notes/{filename}")
 async def esborrar_nota(filename: str):
-    """Mou la nota a la paperera de reciclatge comprovant estrictament que sigui un fitxer regular."""
+    """
+    Mou la nota i els seus documents associats (PDF/HTML) a la subcarpeta Paperera de la biblioteca,
+    i arxiva la seua entrada a biblioteca.bib.
+    """
     path = _ruta_segura_nota(filename)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada o no és un fitxer")
 
-    ok = await asyncio.to_thread(enviar_a_la_papelera, path)
-    if not ok:
-        raise HTTPException(status_code=500, detail="No s'ha pogut moure la nota a la paperera")
-    return {"status": "ok", "message": f"Nota {filename} moguda a la paperera"}
+    trash_notes_dir = PAPERERA_DIR / "notes"
+    trash_docs_dir = PAPERERA_DIR / "documents"
+    trash_notes_dir.mkdir(parents=True, exist_ok=True)
+    trash_docs_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Detectar documents associats abans de moure
+    associated_docs = []
+    try:
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        trobats = detectar_tots_els_pdfs(path, content)
+        for _, p, _ in trobats:
+            if p.is_file() and p.name not in associated_docs:
+                associated_docs.append(p.name)
+    except Exception as e:
+        logger.warning(f"Error detectant documents associats abans de moure a la paperera: {e}")
+
+    # Comprovació canònica addicional (@citekey.md -> citekey.html / citekey.pdf)
+    stem = path.stem[1:] if path.name.startswith("@") else path.stem
+    for ext in [".html", ".pdf"]:
+        c_doc = FONTS_DIR / f"{stem}{ext}"
+        if c_doc.is_file() and c_doc.name not in associated_docs:
+            associated_docs.append(c_doc.name)
+
+    # 2. Moure la nota a Paperera/notes/
+    dest_note = trash_notes_dir / path.name
+    try:
+        shutil.move(str(path), str(dest_note))
+    except Exception as e:
+        logger.error(f"Error movent nota a la paperera: {e}")
+        raise HTTPException(status_code=500, detail=f"No s'ha pogut moure la nota a la paperera: {e}")
+
+    # 3. Moure els documents associats a Paperera/documents/
+    for doc_name in associated_docs:
+        src_doc = FONTS_DIR / doc_name
+        if src_doc.is_file():
+            dest_doc = trash_docs_dir / doc_name
+            try:
+                shutil.move(str(src_doc), str(dest_doc))
+            except Exception as e_doc:
+                logger.warning(f"Error movent document associat {doc_name} a Paperera: {e_doc}")
+
+    # 4. Comentar o arxivar l'entrada a biblioteca.bib si és una cita bibliogràfica
+    if path.name.startswith("@") and BIB_FILE_PATH.exists():
+        citekey = path.stem[1:]
+        try:
+            with bloqueig(BIB_FILE_PATH):
+                bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
+                patro_ent = re.compile(rf'(@\w+\s*\{{\s*{re.escape(citekey)}\s*,[\s\S]*?\n\}})(?=@|\Z)', re.MULTILINE)
+                m_ent = patro_ent.search(bib_text)
+                if m_ent:
+                    ent_original = m_ent.group(1)
+                    # Comentar cada línia amb % DELETED_TRASH
+                    ent_comentada = "\n".join(f"% TRASH: {line}" for line in ent_original.splitlines())
+                    bib_nou = bib_text[:m_ent.start()] + ent_comentada + bib_text[m_ent.end():]
+                    escriure_atomic(BIB_FILE_PATH, bib_nou, backup=True)
+        except Exception as e_bib:
+            logger.warning(f"Error comentant entrada BibTeX a biblioteca.bib: {e_bib}")
+
+    return {"status": "ok", "message": f"Nota {filename} i documents associats moguts a la paperera"}
+
+@router.get("/trash/items")
+async def llistar_paperera():
+    """Llista tots els elements continguts a la Paperera de la biblioteca."""
+    trash_notes_dir = PAPERERA_DIR / "notes"
+    trash_docs_dir = PAPERERA_DIR / "documents"
+    trash_notes_dir.mkdir(parents=True, exist_ok=True)
+    trash_docs_dir.mkdir(parents=True, exist_ok=True)
+
+    items = []
+    # Notes a la paperera
+    for p in trash_notes_dir.iterdir():
+        if p.is_file() and p.suffix.lower() in [".md", ".org"]:
+            try:
+                stat = p.stat()
+                capcalera = p.read_text(encoding="utf-8", errors="ignore")[:1500]
+                titol = _extreure_titol_nota(p, capcalera)
+                
+                # Detectar documents a la paperera
+                stem = p.stem[1:] if p.name.startswith("@") else p.stem
+                docs = []
+                for ext in [".pdf", ".html"]:
+                    cand = trash_docs_dir / f"{stem}{ext}"
+                    if cand.is_file():
+                        docs.append(cand.name)
+
+                items.append({
+                    "filename": p.name,
+                    "title": titol,
+                    "mtime": stat.st_mtime,
+                    "mtime_str": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                    "is_biblio": p.name.startswith("@"),
+                    "documents": docs,
+                    "type": "note"
+                })
+            except Exception:
+                continue
+
+    # Documents orfes a la paperera (que no tinguen nota)
+    notes_stems = {it["filename"].replace(".md", "").replace(".org", "").lstrip("@") for it in items}
+    for d in trash_docs_dir.iterdir():
+        if d.is_file() and d.stem not in notes_stems:
+            try:
+                stat = d.stat()
+                items.append({
+                    "filename": d.name,
+                    "title": d.name,
+                    "mtime": stat.st_mtime,
+                    "mtime_str": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                    "is_biblio": False,
+                    "documents": [d.name],
+                    "type": "doc"
+                })
+            except Exception:
+                continue
+
+    items.sort(key=lambda x: x["mtime"], reverse=True)
+    return {"items": items, "total": len(items)}
+
+@router.post("/trash/restore/{filename}")
+async def restaurar_de_paperera(filename: str):
+    """Restaura un element de la paperera tornant-lo a les carpetes actives de la biblioteca."""
+    trash_notes_dir = PAPERERA_DIR / "notes"
+    trash_docs_dir = PAPERERA_DIR / "documents"
+    
+    src_note = trash_notes_dir / filename
+    src_doc = trash_docs_dir / filename
+
+    if src_note.is_file():
+        dest_note = NOTAS_DIR / filename
+        shutil.move(str(src_note), str(dest_note))
+        
+        # Restaurar documents associats
+        stem = src_note.stem[1:] if src_note.name.startswith("@") else src_note.stem
+        for ext in [".pdf", ".html"]:
+            cand = trash_docs_dir / f"{stem}{ext}"
+            if cand.is_file():
+                shutil.move(str(cand), str(FONTS_DIR / cand.name))
+
+        # Descomentar a biblioteca.bib si correspon
+        if src_note.name.startswith("@") and BIB_FILE_PATH.exists():
+            citekey = src_note.stem[1:]
+            try:
+                with bloqueig(BIB_FILE_PATH):
+                    bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
+                    patro_com = re.compile(rf'((?:% TRASH: [^\n]*\n?)+)', re.MULTILINE)
+                    
+                    def restore_match(m):
+                        block = m.group(1)
+                        if f"{{{citekey}," in block:
+                            lines = block.splitlines()
+                            restored = "\n".join(l.replace("% TRASH: ", "", 1) if l.startswith("% TRASH: ") else l for l in lines)
+                            return restored + "\n"
+                        return block
+
+                    bib_nou = patro_com.sub(restore_match, bib_text)
+                    if bib_nou != bib_text:
+                        escriure_atomic(BIB_FILE_PATH, bib_nou, backup=True)
+            except Exception as e_bib:
+                logger.warning(f"Error restaurant entrada BibTeX: {e_bib}")
+
+        return {"status": "ok", "message": f"{filename} restaurat correctament"}
+
+    elif src_doc.is_file():
+        dest_doc = FONTS_DIR / filename
+        shutil.move(str(src_doc), str(dest_doc))
+        return {"status": "ok", "message": f"{filename} restaurat correctament"}
+
+    raise HTTPException(status_code=404, detail="Fitxer no trobat a la paperera")
+
+@router.delete("/trash/permanent/{filename}")
+async def eliminar_permanent_paperera(filename: str):
+    """Elimina definitivament un fitxer i els seus adjunts de la Paperera."""
+    trash_notes_dir = PAPERERA_DIR / "notes"
+    trash_docs_dir = PAPERERA_DIR / "documents"
+
+    src_note = trash_notes_dir / filename
+    src_doc = trash_docs_dir / filename
+
+    eliminat = False
+    if src_note.is_file():
+        stem = src_note.stem[1:] if src_note.name.startswith("@") else src_note.stem
+        for ext in [".pdf", ".html"]:
+            cand = trash_docs_dir / f"{stem}{ext}"
+            if cand.is_file():
+                cand.unlink(missing_ok=True)
+        src_note.unlink(missing_ok=True)
+        eliminat = True
+
+        # Netejar completament el bloc comentat a biblioteca.bib si existia
+        if src_note.name.startswith("@") and BIB_FILE_PATH.exists():
+            citekey = src_note.stem[1:]
+            try:
+                with bloqueig(BIB_FILE_PATH):
+                    bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
+                    patro_com = re.compile(rf'\n*(?:% TRASH: [^\n]*\n?)+', re.MULTILINE)
+                    def remove_trash_block(m):
+                        block = m.group(0)
+                        if f"{{{citekey}," in block:
+                            return ""
+                        return block
+                    bib_nou = patro_com.sub(remove_trash_block, bib_text)
+                    if bib_nou != bib_text:
+                        escriure_atomic(BIB_FILE_PATH, bib_nou, backup=True)
+            except Exception as e_bib:
+                logger.warning(f"Error netejant entrada esborrada a bibtex: {e_bib}")
+
+    elif src_doc.is_file():
+        src_doc.unlink(missing_ok=True)
+        eliminat = True
+
+    if not eliminat:
+        raise HTTPException(status_code=404, detail="Fitxer no trobat a la paperera")
+
+    return {"status": "ok", "message": f"{filename} eliminat definitivament"}
+
+@router.post("/trash/empty")
+async def buidar_paperera():
+    """Buida completament la Paperera de la biblioteca."""
+    trash_notes_dir = PAPERERA_DIR / "notes"
+    trash_docs_dir = PAPERERA_DIR / "documents"
+    
+    comptador = 0
+    for p in trash_notes_dir.iterdir():
+        if p.is_file():
+            p.unlink(missing_ok=True)
+            comptador += 1
+    for p in trash_docs_dir.iterdir():
+        if p.is_file():
+            p.unlink(missing_ok=True)
+            comptador += 1
+
+    # Netejar tots els comentaris TRASH de biblioteca.bib
+    if BIB_FILE_PATH.exists():
+        try:
+            with bloqueig(BIB_FILE_PATH):
+                bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
+                bib_nou = re.sub(r'\n*(?:% TRASH: [^\n]*\n?)+', '\n', bib_text)
+                if bib_nou != bib_text:
+                    escriure_atomic(BIB_FILE_PATH, bib_nou, backup=True)
+        except Exception as e_bib:
+            logger.warning(f"Error netejant entrades TRASH a bibtex: {e_bib}")
+
+    return {"status": "ok", "message": f"S'han suprimit {comptador} fitxers de la paperera"}
+
+@router.post("/trash/move-doc/{filename}")
+async def moure_document_paperera(filename: str):
+    """Mou un document orfe (PDF/HTML) a la Paperera de la biblioteca."""
+    src = FONTS_DIR / filename
+    if not src.is_file():
+        raise HTTPException(status_code=404, detail="Document no trobat")
+
+    trash_docs_dir = PAPERERA_DIR / "documents"
+    trash_docs_dir.mkdir(parents=True, exist_ok=True)
+    dest = trash_docs_dir / filename
+    try:
+        shutil.move(str(src), str(dest))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error movent document a la paperera: {e}")
+
+    return {"status": "ok", "message": f"Document {filename} mogut a la paperera"}
 
 @router.post("/notes")
 async def crear_nova_nota(req: NovaNotaRequest):

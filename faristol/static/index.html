@@ -1176,6 +1176,23 @@
             color: var(--accent);
             border-color: var(--accent);
         }
+        .btn-trash-item {
+            padding: 1px 5px;
+            font-size: 10px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            color: var(--text-muted);
+            cursor: pointer;
+            opacity: 0.6;
+            transition: all 0.15s ease;
+        }
+        .btn-trash-item:hover {
+            opacity: 1;
+            background: #fee2e2;
+            color: #ef4444;
+            border-color: #fca5a5;
+        }
         .item-col-tag {
             display: inline-flex;
             align-items: center;
@@ -2057,8 +2074,9 @@ const state = {
     pdfs: [],
     tags: [],
     collections: [],
+    trashItems: [],
     activeTab: 'library',    // 'library' | 'notebooklm' | 'search' | 'antigravity'
-    activeCollectionId: null, // null = all, or col_id
+    activeCollectionId: null, // null = all, or col_id, or 'unfiled', or 'trash'
     collapsedCollections: new Set(),
     assigningItem: null,     // { type: 'note'|'pdf', filename: '...' }
     activeTagFilter: '',
@@ -2332,20 +2350,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function carregarDadesBiblioteca(silencios = false) {
     if (!silencios) el.libraryStatus.textContent = 'Carregant...';
     try {
-        const [notesRes, fontsRes, colsRes] = await Promise.all([
+        const [notesRes, fontsRes, colsRes, trashRes] = await Promise.all([
             fetch('/api/notes?_t=' + Date.now()),
             fetch('/api/fonts/list?_t=' + Date.now()),
-            fetch('/api/collections?_t=' + Date.now())
+            fetch('/api/collections?_t=' + Date.now()),
+            fetch('/api/trash/items?_t=' + Date.now()).catch(() => ({ json: () => ({ items: [] }) }))
         ]);
         
         const notesData = await notesRes.json();
         const fontsData = await fontsRes.json();
         const colsData = await colsRes.json();
+        const trashData = await trashRes.json().catch(() => ({ items: [] }));
         
         state.notes = notesData.notes || [];
         state.tags = notesData.tags || [];
         state.pdfs = fontsData.fonts || [];
         state.collections = colsData.collections || [];
+        state.trashItems = trashData.items || [];
         
         if (el.notesCount) el.notesCount.textContent = state.notes.length;
         if (el.pdfsCount) el.pdfsCount.textContent = state.pdfs.length;
@@ -2505,7 +2526,9 @@ function alternarDesplegableColleccions() {
 
 function actualitzarNomColleccioActiva() {
     let nom = 'Tota la Biblioteca';
-    if (state.activeCollectionId === 'unfiled') {
+    if (state.activeCollectionId === 'trash') {
+        nom = 'Paperera';
+    } else if (state.activeCollectionId === 'unfiled') {
         nom = 'Sense arxivar';
     } else if (state.activeCollectionId) {
         const col = state.collections.find(c => c.id === state.activeCollectionId);
@@ -3442,6 +3465,24 @@ function renderitzarColleccions() {
     };
     el.collectionsTreeContainer.appendChild(unfiledNode);
 
+    // 2b. Element arrel: Paperera
+    const trashCount = (state.trashItems || []).length;
+    const trashNode = document.createElement('div');
+    trashNode.className = `col-tree-node ${state.activeCollectionId === 'trash' ? 'active' : ''}`;
+    trashNode.innerHTML = `
+        <span style="width: 14px; text-align: center; font-size: 11px;"><i class="fa-solid fa-trash-can" style="color: #ef4444;"></i></span>
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: ${trashCount > 0 ? '#ef4444' : 'inherit'};">Paperera</span>
+        <span class="col-count-badge" style="${trashCount > 0 ? 'background: rgba(239, 68, 68, 0.15); color: #ef4444;' : ''}">${trashCount}</span>
+    `;
+    trashNode.onclick = () => {
+        state.activeCollectionId = 'trash';
+        actualitzarNomColleccioActiva();
+        renderitzarColleccions();
+        renderitzarLlistaNotes();
+        renderitzarLlistaPDFs();
+    };
+    el.collectionsTreeContainer.appendChild(trashNode);
+
     // Separador suau
     const sep = document.createElement('div');
     sep.style.cssText = 'height: 1px; background: var(--border-subtle); margin: 6px 4px;';
@@ -3656,6 +3697,62 @@ function renderitzarLlistaNotes() {
     const innerEl = document.getElementById('notes-items-inner');
     if (!innerEl) return;
     innerEl.innerHTML = '';
+
+    // VISTA DE LA PAPERERA
+    if (state.activeCollectionId === 'trash') {
+        if (bannerEl) {
+            bannerEl.style.display = 'block';
+            bannerEl.innerHTML = `
+                <div class="collection-filter-banner" style="background: rgba(239, 68, 68, 0.08); border-bottom: 1px solid rgba(239, 68, 68, 0.2); display: flex; justify-content: space-between; align-items: center; padding: 6px 10px;">
+                    <span style="color: #ef4444; font-weight: 600;"><i class="fa-solid fa-trash-can"></i> Paperera de la Biblioteca</span>
+                    <button class="btn btn-sm" style="background: #ef4444; color: #fff; font-size: 10px; padding: 2px 7px; border: none; border-radius: 4px;" onclick="demanarBuidarPaperera()" title="Buidar definitivament tots els elements">
+                        <i class="fa-solid fa-fire"></i> Buidar Paperera
+                    </button>
+                </div>
+            `;
+        }
+
+        const items = state.trashItems || [];
+        if (el.libraryActiveCount) {
+            el.libraryActiveCount.textContent = items.length;
+        }
+
+        if (items.length === 0) {
+            innerEl.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--text-subtle); font-size: 12px;"><i class="fa-solid fa-trash-can" style="font-size: 24px; opacity: 0.3; margin-bottom: 8px; display: block;"></i>La paperera està buida</div>';
+            return;
+        }
+
+        items.forEach(it => {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            const docsCount = (it.documents || []).length;
+            const docBadge = docsCount > 0 ? `<span style="font-size: 10px; opacity: 0.7; margin-left: 4px;">(+${docsCount} adjunt${docsCount > 1 ? 's' : ''})</span>` : '';
+
+            item.innerHTML = `
+                <div class="list-item-title">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; color: var(--text-muted);">
+                        <i class="fa-solid fa-file" style="margin-right: 5px; opacity: 0.6;"></i>
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(it.title || it.filename)}</span>
+                        ${docBadge}
+                    </span>
+                    <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        <button class="btn btn-sm" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer;" title="Restaurar a la biblioteca" onclick="event.stopPropagation(); restaurarElementPaperera('${escapeHtml(it.filename)}')">
+                            <i class="fa-solid fa-rotate-left"></i> Restaurar
+                        </button>
+                        <button class="btn btn-sm" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer;" title="Eliminar definitivament" onclick="event.stopPropagation(); eliminarDefinitiuPaperera('${escapeHtml(it.filename)}')">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="list-item-meta">
+                    <span>${escapeHtml(it.filename)}</span>
+                    <span>${it.mtime_str || ''}</span>
+                </div>
+            `;
+            innerEl.appendChild(item);
+        });
+        return;
+    }
     
     // Banner de filtre per quadern de NotebookLM (si la carpeta en té un)
     if (state.activeCollectionId && state.activeCollectionId !== 'unfiled') {
@@ -3781,6 +3878,9 @@ function renderitzarLlistaNotes() {
                     <button class="btn-col-assign" title="Assignar a carpetes virtuals" onclick="event.stopPropagation(); obrirModalAssignarColleccions('note', '${escapeHtml(nota.filename)}')">
                         <i class="fa-solid fa-folder-plus"></i>
                     </button>
+                    <button class="btn-trash-item" title="Moure a la paperera" onclick="event.stopPropagation(); demanarMoureNotaPaperera('${escapeHtml(nota.filename)}')">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
                 </div>
             </div>
             <div class="list-item-meta">
@@ -3820,6 +3920,9 @@ function renderitzarLlistaNotes() {
                     <span class="badge-pdf" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px;"><i class="fa-solid fa-file-pdf"></i> PDF</span>
                     <button class="btn-col-assign" title="Assignar a carpetes virtuals" onclick="event.stopPropagation(); obrirModalAssignarColleccions('pdf', '${escapeHtml(pdf.filename)}')">
                         <i class="fa-solid fa-folder-plus"></i>
+                    </button>
+                    <button class="btn-trash-item" title="Moure a la paperera" onclick="event.stopPropagation(); demanarMourePdfPaperera('${escapeHtml(pdf.filename)}')">
+                        <i class="fa-solid fa-trash-can"></i>
                     </button>
                 </div>
             </div>
@@ -6916,6 +7019,108 @@ function urlSegura(u) {
         return escapeHtml(net);
     }
     return '';
+}
+
+// --- Gestió de la Paperera de la Biblioteca ---
+async function demanarMoureNotaPaperera(filename) {
+    if (!confirm(`Vols moure "${filename}" i els seus documents associats a la Paperera de la biblioteca?`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`/api/notes/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+        if (res.ok) {
+            if (state.activeNoteFilename === filename) {
+                netejarEditor();
+                netejarVisorPdf();
+            }
+            await carregarDadesBiblioteca(true);
+            actualitzarNomColleccioActiva();
+            renderitzarColleccions();
+            renderitzarLlistaNotes();
+            renderitzarLlistaPDFs();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert(`Error movent a la paperera: ${err.detail || 'Error desconegut'}`);
+        }
+    } catch (e) {
+        alert(`Error de xarxa: ${e.message}`);
+    }
+}
+
+async function demanarMourePdfPaperera(filename) {
+    if (!confirm(`Vols moure el document "${filename}" a la Paperera?`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`/api/trash/move-doc/${encodeURIComponent(filename)}`, { method: 'POST' });
+        if (res.ok) {
+            if (state.activePdfFilename === filename) {
+                netejarVisorPdf();
+            }
+            await carregarDadesBiblioteca(true);
+            actualitzarNomColleccioActiva();
+            renderitzarColleccions();
+            renderitzarLlistaNotes();
+            renderitzarLlistaPDFs();
+        } else {
+            alert("No s'ha pogut moure el document a la paperera.");
+        }
+    } catch (e) {
+        alert(`Error de xarxa: ${e.message}`);
+    }
+}
+
+async function restaurarElementPaperera(filename) {
+    try {
+        const res = await fetch(`/api/trash/restore/${encodeURIComponent(filename)}`, { method: 'POST' });
+        if (res.ok) {
+            await carregarDadesBiblioteca(true);
+            renderitzarColleccions();
+            renderitzarLlistaNotes();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert(`Error restaurant: ${err.detail || 'Error desconegut'}`);
+        }
+    } catch (e) {
+        alert(`Error de xarxa: ${e.message}`);
+    }
+}
+
+async function eliminarDefinitiuPaperera(filename) {
+    if (!confirm(`ATENCIÓ: Esborrar definitivament "${filename}"?\nAquesta acció NO es pot desfer.`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`/api/trash/permanent/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+        if (res.ok) {
+            await carregarDadesBiblioteca(true);
+            renderitzarColleccions();
+            renderitzarLlistaNotes();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert(`Error eliminant: ${err.detail || 'Error desconegut'}`);
+        }
+    } catch (e) {
+        alert(`Error de xarxa: ${e.message}`);
+    }
+}
+
+async function demanarBuidarPaperera() {
+    if (!confirm("Vols eliminar definitivament TOTS els elements de la Paperera?\nAquesta acció NO es pot desfer.")) {
+        return;
+    }
+    try {
+        const res = await fetch('/api/trash/empty', { method: 'POST' });
+        if (res.ok) {
+            await carregarDadesBiblioteca(true);
+            renderitzarColleccions();
+            renderitzarLlistaNotes();
+        } else {
+            alert("Error buidant la paperera.");
+        }
+    } catch (e) {
+        alert(`Error de xarxa: ${e.message}`);
+    }
 }
 </script>
 
