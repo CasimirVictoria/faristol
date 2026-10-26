@@ -362,7 +362,19 @@
             color: #991b1b;
             padding: 1px 5px;
             border-radius: 4px;
-            font-weight: 500;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .badge-html {
+            font-size: 10px;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 600;
             display: inline-flex;
             align-items: center;
             gap: 3px;
@@ -3737,10 +3749,14 @@ function renderitzarLlistaNotes() {
         let typeBadge = '';
         let itemIcon = '';
         if (isBiblio) {
-            if (nota.has_pdf) {
-                typeBadge = `<span class="badge-pdf" title="Article amb PDF"><i class="fa-solid fa-file-pdf"></i> PDF</span>`;
+            if (nota.has_pdf_doc || (nota.has_pdf && nota.doc_format === 'pdf')) {
+                typeBadge = `<span class="badge-pdf" title="Document PDF"><i class="fa-solid fa-file-pdf"></i> PDF</span>`;
+            } else if (nota.has_html_doc || nota.doc_format === 'html') {
+                typeBadge = `<span class="badge-html" title="Pàgina web estàtica (HTML / SingleFile)"><i class="fa-solid fa-globe"></i> Web</span>`;
+            } else if (nota.has_pdf) {
+                typeBadge = `<span class="badge-pdf" title="Document"><i class="fa-solid fa-file-pdf"></i> PDF</span>`;
             } else {
-                typeBadge = `<span class="badge-no-pdf" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;" title="Referència sense PDF"><i class="fa-solid fa-file-circle-xmark"></i> Sense PDF</span>`;
+                typeBadge = `<span class="badge-no-pdf" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;" title="Referència sense document"><i class="fa-solid fa-file-circle-xmark"></i> Sense Doc</span>`;
             }
             itemIcon = `<i class="fa-solid fa-book-bookmark" style="color: var(--accent); font-size: 11px; margin-right: 4px; flex-shrink: 0;"></i>`;
         } else {

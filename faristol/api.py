@@ -232,6 +232,9 @@ async def llistar_notes(q: Optional[str] = None, tag: Optional[str] = None):
                 continue
 
             pdfs = detectar_tots_els_pdfs(path, capcalera)
+            has_pdf_doc = any(Path(p[1]).suffix.lower() == ".pdf" for p in pdfs)
+            has_html_doc = any(Path(p[1]).suffix.lower() in [".html", ".htm"] for p in pdfs)
+            doc_format = "pdf" if has_pdf_doc else ("html" if has_html_doc else "")
 
             notes.append({
                 "filename": path.name,
@@ -245,6 +248,9 @@ async def llistar_notes(q: Optional[str] = None, tag: Optional[str] = None):
                 "size": stat.st_size,
                 "has_pdf": len(pdfs) > 0,
                 "pdf_count": len(pdfs),
+                "has_pdf_doc": has_pdf_doc,
+                "has_html_doc": has_html_doc,
+                "doc_format": doc_format,
                 "is_biblio": path.name.startswith("@"),
             })
         except Exception:
