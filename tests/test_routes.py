@@ -28,6 +28,7 @@ RUTES_ESPERADES = {
     ("GET", "/notes/{filename}/connections"),
     ("GET", "/pdf/highlights"),
     ("GET", "/pdf/stream"),
+    ("GET", "/session"),
     ("GET", "/trash/items"),
     ("POST", "/academic/import"),
     ("POST", "/collections"),

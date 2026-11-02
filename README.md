@@ -313,6 +313,35 @@ systemctl --user stop faristol.service
 
 ---
 
+## 🔐 Autenticació i Sessió (Recorda'm)
+
+Faristol pot protegir-se amb **autenticació per sessió** basada en cookie `HttpOnly`, pensada per a l'ús còmode des del mòbil (recorda el dispositiu fins a **30 dies**).
+
+Per a activar-la, definix usuari i contrasenya a `~/.config/faristol/faristol.env`:
+
+```ini
+FARISTOL_AUTH_USER=el_teu_usuari
+FARISTOL_AUTH_PASSWORD=la_teua_contrasenya
+# Opcional: secret de signatura (si no, se'n genera un i es guarda a session_secret)
+# FARISTOL_SESSION_SECRET=...
+# FARISTOL_SESSION_DAYS=30
+# FARISTOL_COOKIE_SECURE=1   # només si servixes per HTTPS
+```
+
+```bash
+systemctl --user restart faristol.service
+```
+
+Com funciona:
+- Sense sessió, l'API respon **`401`** i les pàgines HTML redirigeixen a **`/login`**.
+- En iniciar sessió, s'establix una cookie `faristol_session` **`HttpOnly`** + `SameSite=Lax`, signada (HMAC-SHA256) amb caducitat de 30 dies (el clàssic «Recorda'm»).
+- El botó **⏻ (Tancar sessió)** de la barra superior esborra la sessió; si la sessió caduca amb l'app oberta, es torna automàticament a `/login`.
+- El propi `/login` i els **arxius estàtics** no requerixen sessió.
+
+> 🔒 Si **no** definixes `FARISTOL_AUTH_USER` i `FARISTOL_AUTH_PASSWORD`, l'autenticació queda **desactivada** i tot és accessible (comportament retrocompatible). Combina-la sempre amb la llista blanca d'amfitrions i, per a accés remot, amb Tailscale.
+
+---
+
 ## 💻 Execució Manual per Consola
 
 Si prefereixes executar Faristol de forma interactiva sense el servei systemd:

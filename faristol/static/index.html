@@ -1431,6 +1431,9 @@
                 <button class="btn btn-sm btn-icon-only" id="btn-collapse-sidebar" title="Ocultar biblioteca (F9)" style="padding: 2px 6px; font-size: 11px; margin-bottom: 2px; border: none; background: transparent; color: var(--text-muted);">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
+                <button class="btn btn-sm btn-icon-only" id="btn-logout" title="Tancar sessió" style="padding: 2px 6px; font-size: 11px; margin-bottom: 2px; border: none; background: transparent; color: var(--text-muted);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
             </div>
 
             <!-- Vista 1: Biblioteca Unificada -->
@@ -2056,6 +2059,16 @@
 /**
  * Faristol Web — Client SPA
  */
+// Si la sessió ha caducat (l'API respon 401), torna al formulari de login.
+const _fetchOriginal = window.fetch.bind(window);
+window.fetch = async (...args) => {
+    const resposta = await _fetchOriginal(...args);
+    if (resposta.status === 401 && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+    }
+    return resposta;
+};
+
 const state = {
     notes: [],
     pdfs: [],
@@ -5445,6 +5458,13 @@ function configurarEvents() {
     const btnCollapseSidebar = document.getElementById('btn-collapse-sidebar');
     if (btnCollapseSidebar) {
         btnCollapseSidebar.onclick = () => el.panelLibrary.classList.add('collapsed');
+    }
+    const btnLogout = document.getElementById('btn-logout');
+    if (btnLogout) {
+        btnLogout.onclick = async () => {
+            try { await fetch('/logout', { method: 'POST' }); } catch (e) { /* ignora */ }
+            window.location.href = '/login';
+        };
     }
     const btnTogglePdf = document.getElementById('btn-toggle-pdf');
     if (btnTogglePdf) {
