@@ -247,8 +247,29 @@ chmod +x install.sh
 
 Faristol inclou una unitat de servei d'usuari a [`systemd/faristol.service`](systemd/faristol.service) per funcionar de forma permanent en segon pla:
 - **Arrencada silenciosa i persistent:** S'inicia automàticament a cada inici de sessió de Linux.
-- **Accés universal:** Escolta a `0.0.0.0:8080`, fent-lo accessible immediatament tant en local (`http://localhost:8080`) com a través de la teua xarxa privada segura de **Tailscale** (`http://<IP-Tailscale>:8080`) des del mòbil o tauleta.
+- **Accés universal:** El servei escolta a `0.0.0.0:8080` (totes les interfícies de xarxa), de manera que és accessible immediatament:
+  - **En local:** `http://localhost:8080` o `http://127.0.0.1:8080`.
+  - **A la xarxa local (LAN):** `http://<nom-equip>:8080` (p. ex. `http://casalap:8080`) o `http://<IP-LAN>:8080`.
+  - **Via Tailscale:** `http://<IP-Tailscale>:8080` o `http://<nom-equip>.<tailnet>.ts.net:8080` (p. ex. `http://100.80.29.31:8080`), des del mòbil o tauleta.
 - **Reinici automàtic:** Si el procés s'atura per qualsevol motiu, systemd el reinicia automàticament en 3 segons.
+
+> ⚠️ **Nota de seguretat i llista blanca d'amfitrions:** En escoltar a `0.0.0.0`, Faristol queda accessible des de qualsevol equip de la teua xarxa local. Per això valida cada petició amb una **llista blanca d'amfitrions**, configurable amb la variable d'entorn **`FARISTOL_ALLOWED_HOSTS`** (valors separats per comes; s'admet el comodí `*.domini`). Si no es defineix, només s'accepten les adreces locals (`127.0.0.1`, `localhost`). Si hi accedeixes per una adreça que no hi consta, rebràs un error *«Invalid host header»*.
+
+Per a accedir-hi des de **Tailscale** i la **xarxa local**, definix els amfitrions permesos a la unitat systemd (o en un `EnvironmentFile`):
+
+```ini
+# systemd/faristol.service
+Environment=FARISTOL_ALLOWED_HOSTS=127.0.0.1,localhost,casalap,192.168.1.111,100.80.29.31,*.ts.net
+```
+
+Després de canviar la llista, recarrega systemd i reinicia el servei:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart faristol.service
+```
+
+> **No obris mai este port directament a Internet**; per a l'accés remot fora de casa fes servir sempre **Tailscale**.
 
 ### Gestió del servei
 
@@ -287,6 +308,16 @@ faristol @berzosaPensamentComputacional2024.md
 # Especificar un port alternatiu o mode sense obrir navegador
 faristol --port 8090
 faristol --no-browser
+```
+
+> ℹ️ **Amfitrió d'escolta (host):** El servei systemd de més amunt escolta a `0.0.0.0` (accessible a la LAN i a Tailscale). En canvi, l'execució manual `faristol` escolta per defecte a `127.0.0.1` (només local). Si vols exposar una execució manual a la xarxa local o a Tailscale, indica-ho explícitament amb `--host`:
+
+```bash
+# Exposar una execució manual a totes les interfícies (LAN + Tailscale)
+faristol --host 0.0.0.0
+
+# Canviar de port i no obrir el navegador
+faristol --host 0.0.0.0 --port 8090 --no-browser
 ```
 
 ---

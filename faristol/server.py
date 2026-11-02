@@ -3,6 +3,7 @@ Servidor FastAPI per a Faristol.
 Serveix la interfície web i munta els endpoints de l'API amb protecció contra CSRF,
 DNS rebinding i restricció d'orígens.
 """
+import os
 import urllib.parse
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -21,16 +22,36 @@ app = FastAPI(
     version="1.1.0"
 )
 
-# 1. Protecció contra DNS Rebinding i control de capçalera Host
-HOSTS_PERMESOS = [
-    "127.0.0.1",
-    "localhost",
-    "casalap",
-    "casalap.tailb8f4b1.ts.net",
-    "*.ts.net",
-    "100.80.29.31",
-    "testserver"
-]
+# 1. Protecció contra DNS Rebinding i control de capçalera Host.
+#    La llista blanca d'amfitrions és configuració, no codi: es llig de la
+#    variable d'entorn FARISTOL_ALLOWED_HOSTS (valors separats per comes,
+#    s'admet el comodí '*.domini'). Si no es defineix, només s'accepten
+#    les adreces locals per seguretat.
+_HOSTS_PER_DEFECTE = ["127.0.0.1", "localhost", "testserver"]
+
+def _llegir_hosts_permesos() -> list[str]:
+    valor = os.environ.get("FARISTOL_ALLOWED_HOSTS", "").strip()
+    if not valor:
+        return list(_HOSTS_PER_DEFECTE)
+    hosts = [h.strip() for h in valor.split(",") if h.strip()]
+    return hosts or list(_HOSTS_PER_DEFECTE)
+
+HOSTS_PERMESOS = _llegir_hosts_permesos()
+
+def _host_permès(host: str) -> bool:
+    """Comprova si un amfitrió és a la llista blanca, admetent comodins ('*.exemple.com')."""
+    host = (host or "").lower()
+    if not host:
+        return False
+    for patro in HOSTS_PERMESOS:
+        p = patro.lower()
+        if p.startswith("*."):
+            if host == p[2:] or host.endswith(p[1:]):
+                return True
+        elif host == p:
+            return True
+    return False
+
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=HOSTS_PERMESOS)
 
 # 2. Middleware d'Aïllament d'Orígens i Protecció contra CSRF
@@ -68,11 +89,10 @@ async def verificar_origen_csrf(request: Request, call_next):
                 parsed = urllib.parse.urlparse(font_verificacio)
                 origin_host = (parsed.hostname or "").lower()
 
-                # Comprovar si l'origen coincideix amb el host sol·licitat o pertany a la xarxa local/Tailscale
+                # Comprovar si l'origen coincideix amb el host sol·licitat o és a la llista blanca configurada
                 es_valid = (
                     origin_host == host_header or
-                    origin_host in ("127.0.0.1", "localhost", "casalap", "100.80.29.31") or
-                    origin_host.endswith(".ts.net")
+                    _host_permès(origin_host)
                 )
                 if not es_valid:
                     return _afegir_capçaleres_seguretat(JSONResponse(

@@ -5,11 +5,16 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/Projects/faristol
-ExecStart=/usr/bin/python3 -m uvicorn faristol.server:app --host 127.0.0.1 --port 8080
+ExecStart=/usr/bin/python3 -m uvicorn faristol.server:app --host 0.0.0.0 --port 8080
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONPATH=%h/Projects/faristol
+# Llista blanca d'amfitrions accessibles (protecció DNS rebinding / CSRF).
+# Afig-hi el nom de l'equip, la IP de la LAN i la IP/domini de Tailscale,
+# separats per comes. S'admet el comodí '*.domini'.
+# Si no es defineix, només s'accepten les adreces locals (127.0.0.1, localhost).
+Environment=FARISTOL_ALLOWED_HOSTS=127.0.0.1,localhost,casalap,192.168.1.111,100.80.29.31,*.ts.net
 
 [Install]
 WantedBy=default.target
