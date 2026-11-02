@@ -14,6 +14,11 @@ from fastapi import APIRouter, HTTPException, Query
 
 from faristol.api.common import _ruta_segura_nota, logger
 from faristol.api.models import AcademicImportRequest
+from faristol.config import (
+    MCP_ACADEMIC_DIR,
+    MCP_OPEN_DATA_DIR,
+    MCP_REAL_ESTATE_DIR,
+)
 from faristol.fsatomic import bloqueig, escriure_atomic
 
 router = APIRouter()
@@ -25,7 +30,7 @@ def _get_mcp_open_data():
     global _MCP_OPEN_DATA_MOD
     if _MCP_OPEN_DATA_MOD is not None:
         return _MCP_OPEN_DATA_MOD
-    open_dir = Path.home() / "Projects" / "mcp-server-open-data-spain"
+    open_dir = MCP_OPEN_DATA_DIR
     if open_dir.exists():
         import glob
         for sp in glob.glob(str(open_dir / ".venv/lib/python3.*/site-packages")):
@@ -46,7 +51,7 @@ def _get_mcp_real_estate():
     global _MCP_REAL_ESTATE_MOD
     if _MCP_REAL_ESTATE_MOD is not None:
         return _MCP_REAL_ESTATE_MOD
-    real_dir = Path.home() / "Projects" / "mcp-server-real-estate-spain"
+    real_dir = MCP_REAL_ESTATE_DIR
     if real_dir.exists():
         import glob
         for sp in glob.glob(str(real_dir / ".venv/lib/python3.*/site-packages")):
@@ -289,7 +294,7 @@ async def cerca_academica_federada(
         return {"query": q, "translations": {}, "total": len(results), "results": results}
 
     # Query academic-spain
-    mcp_academic_dir = Path.home() / "Projects" / "mcp-server-academic-spain"
+    mcp_academic_dir = MCP_ACADEMIC_DIR
     if mcp_academic_dir.exists():
         import glob
         for sp in glob.glob(str(mcp_academic_dir / "venv/lib/python3.*/site-packages")):

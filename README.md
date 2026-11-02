@@ -247,7 +247,7 @@ faristol/
 - Python 3.10 o superior.
 - Navegador web modern (Firefox, Chromium, Brave).
 - Opcional: `okular` (visor natiu KDE), `kate` (editor natiu KDE), `nlm` (NotebookLM CLI).
-  - Faristol localitza `nlm` automàticament al `PATH` i, si no hi és, a `~/.local/bin/nlm`. Si el tens en un altre lloc, indica'l amb la variable d'entorn **`FARISTOL_NLM_BIN`** (p. ex. `Environment=FARISTOL_NLM_BIN=/ruta/a/nlm` a la unitat systemd).
+  - Faristol localitza `nlm` automàticament al `PATH` i, si no hi és, a `~/.local/bin/nlm`. Si el tens en un altre lloc, indica'l amb la variable d'entorn **`FARISTOL_NLM_BIN`** a `~/.config/faristol/faristol.env` (vegeu [`systemd/faristol.env.example`](systemd/faristol.env.example)).
 
 ### Instal·lació automàtica (amb servei Systemd)
 
@@ -272,17 +272,17 @@ Faristol inclou una unitat de servei d'usuari a [`systemd/faristol.service`](sys
 - **Arrencada silenciosa i persistent:** S'inicia automàticament a cada inici de sessió de Linux.
 - **Accés universal:** El servei escolta a `0.0.0.0:8080` (totes les interfícies de xarxa), de manera que és accessible immediatament:
   - **En local:** `http://localhost:8080` o `http://127.0.0.1:8080`.
-  - **A la xarxa local (LAN):** `http://<nom-equip>:8080` (p. ex. `http://casalap:8080`) o `http://<IP-LAN>:8080`.
-  - **Via Tailscale:** `http://<IP-Tailscale>:8080` o `http://<nom-equip>.<tailnet>.ts.net:8080` (p. ex. `http://100.80.29.31:8080`), des del mòbil o tauleta.
+  - **A la xarxa local (LAN):** `http://<nom-equip>:8080` o `http://<IP-LAN>:8080`.
+  - **Via Tailscale:** `http://<IP-Tailscale>:8080` o `http://<nom-equip>.<tailnet>.ts.net:8080`, des del mòbil o tauleta.
 - **Reinici automàtic:** Si el procés s'atura per qualsevol motiu, systemd el reinicia automàticament en 3 segons.
 
 > ⚠️ **Nota de seguretat i llista blanca d'amfitrions:** En escoltar a `0.0.0.0`, Faristol queda accessible des de qualsevol equip de la teua xarxa local. Per això valida cada petició amb una **llista blanca d'amfitrions**, configurable amb la variable d'entorn **`FARISTOL_ALLOWED_HOSTS`** (valors separats per comes; s'admet el comodí `*.domini`). Si no es defineix, només s'accepten les adreces locals (`127.0.0.1`, `localhost`). Si hi accedeixes per una adreça que no hi consta, rebràs un error *«Invalid host header»*.
 
-Per a accedir-hi des de **Tailscale** i la **xarxa local**, definix els amfitrions permesos a la unitat systemd (o en un `EnvironmentFile`):
+La configuració local (llista blanca, ruta de `nlm`, directoris MCP...) viu **fora del repositori**, a `~/.config/faristol/faristol.env` (el servei el llig via `EnvironmentFile=`; vegeu la plantilla [`systemd/faristol.env.example`](systemd/faristol.env.example)). L'instal·lador el crea automàticament si no existeix. Per a accedir-hi des de **Tailscale** i la **xarxa local**, ajusta-n'hi la llista:
 
 ```ini
-# systemd/faristol.service
-Environment=FARISTOL_ALLOWED_HOSTS=127.0.0.1,localhost,casalap,192.168.1.111,100.80.29.31,*.ts.net
+# ~/.config/faristol/faristol.env
+FARISTOL_ALLOWED_HOSTS=127.0.0.1,localhost,<nom-equip>,<IP-LAN>,<IP-Tailscale>,*.ts.net
 ```
 
 Després de canviar la llista, recarrega systemd i reinicia el servei:

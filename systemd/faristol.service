@@ -10,11 +10,10 @@ Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONPATH=%h/Projects/faristol
-# Llista blanca d'amfitrions accessibles (protecció DNS rebinding / CSRF).
-# Afig-hi el nom de l'equip, la IP de la LAN i la IP/domini de Tailscale,
-# separats per comes. S'admet el comodí '*.domini'.
-# Si no es defineix, només s'accepten les adreces locals (127.0.0.1, localhost).
-Environment=FARISTOL_ALLOWED_HOSTS=127.0.0.1,localhost,casalap,192.168.1.111,100.80.29.31,*.ts.net
+# Configuració local (fora del repositori, sense valors personals al codi):
+# llista blanca d'amfitrions, ruta de nlm, directoris MCP... Vegeu
+# systemd/faristol.env.example. El prefix '-' fa que el fitxer siga opcional.
+EnvironmentFile=-%h/.config/faristol/faristol.env
 
 [Install]
 WantedBy=default.target

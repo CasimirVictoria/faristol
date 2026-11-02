@@ -24,9 +24,20 @@ ln -sf "$DIR/bin/faristol" "$BIN_DEST/faristol"
 chmod +x "$DIR/bin/faristol"
 echo "  ✓ $BIN_DEST/faristol enllaçat"
 
-# 3. Instal·lar i activar el servei d'usuari a systemd
+# 3. Configuració local (fora del repositori). No sobreescriure si ja existeix.
+ENV_DEST="$HOME/.config/faristol/faristol.env"
+mkdir -p "$(dirname "$ENV_DEST")"
+if [ ! -f "$ENV_DEST" ]; then
+    cp "$DIR/systemd/faristol.env.example" "$ENV_DEST"
+    echo "  ✓ Creat $ENV_DEST (edita'l per a la teua xarxa)"
+else
+    echo "  • Es conserva $ENV_DEST existent"
+fi
+
+# 4. Instal·lar i activar el servei d'usuari a systemd amb la ruta real del projecte
 mkdir -p "$SYSTEMD_DEST"
-cp -f "$DIR/systemd/faristol.service" "$SYSTEMD_DEST/faristol.service"
+DIR_SED="$(printf '%s' "$DIR" | sed -e 's/[&|\\]/\\&/g')"
+sed "s|%h/Projects/faristol|$DIR_SED|g" "$DIR/systemd/faristol.service" > "$SYSTEMD_DEST/faristol.service"
 
 systemctl --user daemon-reload
 systemctl --user enable --now faristol.service
