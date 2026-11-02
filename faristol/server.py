@@ -34,51 +34,60 @@ HOSTS_PERMESOS = [
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=HOSTS_PERMESOS)
 
 # 2. Middleware d'Aïllament d'Orígens i Protecció contra CSRF
-@app.middleware("http")
-async def verificar_origen_csrf(request: Request, call_next):
-    # Els mètodes segurs de lectura no alteren estat a disc
-    if request.method in ("GET", "HEAD", "OPTIONS"):
-        return await call_next(request)
-
-    # Validar peticions amb canvi d'estat (POST, PUT, DELETE, PATCH)
-    origin = request.headers.get("origin")
-    referer = request.headers.get("referer")
-    sec_fetch_site = request.headers.get("sec-fetch-site", "").lower()
-    host_header = request.headers.get("host", "").lower().split(":")[0]
-
-    if sec_fetch_site == "cross-site":
-        return JSONResponse(
-            {"detail": "Petició cross-site bloquejada per protecció CSRF (Sec-Fetch-Site)."},
-            status_code=403
-        )
-
-    font_verificacio = origin or referer
-    if font_verificacio:
-        if origin and origin.strip().lower() == "null":
-            return JSONResponse({"detail": "Origen 'null' no autoritzat per protecció CSRF."}, status_code=403)
-        try:
-            parsed = urllib.parse.urlparse(font_verificacio)
-            origin_host = (parsed.hostname or "").lower()
-            
-            # Comprovar si l'origen coincideix amb el host sol·licitat o pertany a la xarxa local/Tailscale
-            es_valid = (
-                origin_host == host_header or
-                origin_host in ("127.0.0.1", "localhost", "casalap", "100.80.29.31") or
-                origin_host.endswith(".ts.net")
-            )
-            if not es_valid:
-                return JSONResponse(
-                    {"detail": f"Origen no autoritzat ({origin_host}). Petició bloquejada per protecció CSRF."},
-                    status_code=403
-                )
-        except Exception:
-            return JSONResponse({"detail": "Capçalera d'origen no vàlida"}, status_code=400)
-
-    # Afegir capçaleres de seguretat bàsiques
-    response = await call_next(request)
+def _afegir_capçaleres_seguretat(response):
+    """Aplica les capçaleres de seguretat bàsiques a qualsevol resposta."""
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     return response
+
+@app.middleware("http")
+async def verificar_origen_csrf(request: Request, call_next):
+    # Els mètodes segurs de lectura (GET, HEAD, OPTIONS) no alteren estat a disc,
+    # així que no requereixen validació d'origen CSRF, però SÍ capçaleres de seguretat.
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        # Validar peticions amb canvi d'estat (POST, PUT, DELETE, PATCH)
+        origin = request.headers.get("origin")
+        referer = request.headers.get("referer")
+        sec_fetch_site = request.headers.get("sec-fetch-site", "").lower()
+        host_header = request.headers.get("host", "").lower().split(":")[0]
+
+        if sec_fetch_site == "cross-site":
+            return _afegir_capçaleres_seguretat(JSONResponse(
+                {"detail": "Petició cross-site bloquejada per protecció CSRF (Sec-Fetch-Site)."},
+                status_code=403
+            ))
+
+        font_verificacio = origin or referer
+        if font_verificacio:
+            if origin and origin.strip().lower() == "null":
+                return _afegir_capçaleres_seguretat(JSONResponse(
+                    {"detail": "Origen 'null' no autoritzat per protecció CSRF."},
+                    status_code=403
+                ))
+            try:
+                parsed = urllib.parse.urlparse(font_verificacio)
+                origin_host = (parsed.hostname or "").lower()
+
+                # Comprovar si l'origen coincideix amb el host sol·licitat o pertany a la xarxa local/Tailscale
+                es_valid = (
+                    origin_host == host_header or
+                    origin_host in ("127.0.0.1", "localhost", "casalap", "100.80.29.31") or
+                    origin_host.endswith(".ts.net")
+                )
+                if not es_valid:
+                    return _afegir_capçaleres_seguretat(JSONResponse(
+                        {"detail": f"Origen no autoritzat ({origin_host}). Petició bloquejada per protecció CSRF."},
+                        status_code=403
+                    ))
+            except Exception:
+                return _afegir_capçaleres_seguretat(JSONResponse(
+                    {"detail": "Capçalera d'origen no vàlida"},
+                    status_code=400
+                ))
+
+    # Afegir capçaleres de seguretat bàsiques a TOTES les respostes (incloses les de lectura)
+    response = await call_next(request)
+    return _afegir_capçaleres_seguretat(response)
 
 # Incloure endpoints de l'API
 app.include_router(api_router)
