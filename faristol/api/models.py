@@ -1,0 +1,86 @@
+"""Models Pydantic de l'API."""
+
+from typing import List, Optional
+
+from pydantic import BaseModel
+
+
+class GuardarNotaRequest(BaseModel):
+    contingut: str
+
+class NovaNotaRequest(BaseModel):
+    titol: str
+    tags: str = ""
+    plantilla: str = "estat_art"
+    contingut: Optional[str] = None
+
+class SaveHighlightRequest(BaseModel):
+    pdf_path: str
+    page: int
+    text: str
+    rects: list
+    color: str = "#fef08a"
+    comment: str = ""
+
+class AcademicImportRequest(BaseModel):
+    identifier: str
+    vpn: bool = False
+    pdf_url: Optional[str] = None
+
+class FaristolCompanionNoteRequest(BaseModel):
+    pdf: str
+
+class FaristolOpenExternalRequest(BaseModel):
+    pdf: str
+
+class FaristolOpenNoteExternalRequest(BaseModel):
+    filename: str
+
+class FaristolIngestUrlRequest(BaseModel):
+    url: str
+
+class NovaColleccioRequest(BaseModel):
+    name: str
+    parent_id: Optional[str] = None
+    icon: Optional[str] = None
+
+class ActualitzarColleccioRequest(BaseModel):
+    name: Optional[str] = None
+    parent_id: Optional[str] = None
+    icon: Optional[str] = None
+
+class ItemColleccioRequest(BaseModel):
+    type: str  # "note" o "pdf"
+    filename: str
+
+class SetItemCollectionsRequest(BaseModel):
+    type: str
+    filename: str
+    collection_ids: List[str]
+
+class GuardarColleccionsRequest(BaseModel):
+    collections: List[dict]
+
+class NlmQueryRequest(BaseModel):
+    notebook_id: str
+    query: str
+    conversation_id: Optional[str] = None
+    source_id: Optional[str] = None
+    source_ids: Optional[List[str]] = None
+
+class NlmAddUrlRequest(BaseModel):
+    notebook_id: str
+    url: str
+
+class NlmDeleteRequest(BaseModel):
+    target_type: str  # 'notebook' or 'source'
+    item_id: str
+    notebook_id: Optional[str] = None
+
+class NlmSintesiRequest(BaseModel):
+    fitxer_desti: str
+    pregunta: str
+    resposta: str
+    origen: str
+
+

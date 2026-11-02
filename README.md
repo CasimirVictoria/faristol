@@ -194,6 +194,28 @@ Configuració i metadades auxiliars:
 └── highlights.json             # Subratllats de lectura persistents
 ```
 
+### 🧩 Arquitectura del codi font
+
+L'API (FastAPI) està modularitzada en un paquet `faristol/api/`, amb un subrouter per domini que es munten davall del prefix `/api`:
+
+```text
+faristol/
+├── server.py            # Aplicació FastAPI, seguretat (Host/CSRF/capçaleres) i fitxers estàtics
+├── api/
+│   ├── __init__.py      # Router principal (/api) que agrega els subrouters
+│   ├── common.py        # Logger i validació estricta de rutes (_ruta_segura_nota, _document_segur)
+│   ├── models.py        # Models Pydantic de les peticions
+│   ├── notes.py         # Notes, paperera, connexions i subratllats
+│   ├── pdf.py           # Streaming de PDF i subratllats
+│   ├── library.py       # Biblioteca, fonts, esdeveniments SSE i BibTeX
+│   ├── search.py        # Cerca acadèmica federada, Zotero-less i MCP local
+│   ├── workbench.py     # Accions del banc de treball (integració externa)
+│   ├── collections.py   # Col·leccions virtuals
+│   └── nlm.py           # NotebookLM (RAG)
+├── config.py  utils.py  bibtex.py  fsatomic.py
+└── static/              # Interfície web (HTML/CSS/JS, Vditor, PDF.js, KaTeX)
+```
+
 ### 🏷️ La Convenció de l'Arroba (`@`): Notes Bibliogràfiques vs. Notes Pròpies
 
 | Tipus de Nota | Nomenclatura del fitxer | Descripció i Propòsit | Exemple |
