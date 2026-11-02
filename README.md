@@ -345,6 +345,22 @@ faristol --host 0.0.0.0 --port 8090 --no-browser
 
 ---
 
+## 🧪 Tests
+
+Faristol inclou una suite de proves (`pytest`) que aïlla totes les dades en un directori temporal i **no toca la teua biblioteca real**:
+
+```bash
+# Instal·lar les dependències de desenvolupament
+pip install -e ".[dev]"
+
+# Executar la suite
+pytest
+```
+
+Cobreix la superfície de rutes de l'API, les defenses de seguretat (capçaleres, llista blanca d'amfitrions i CSRF), la validació estricta de rutes (anti *path traversal*) i els cicles de vida de notes i subratllats.
+
+---
+
 ## ⚠️ Avís de Responsabilitat i Projecte Personal
 
 Aquest és un **projecte personal de recerca i desenvolupament**, concebut per donar resposta a les necessitats particulars d'estudi de l'autor:

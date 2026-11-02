@@ -20,8 +20,18 @@ dependencies = [
     "python-multipart>=0.0.6"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "httpx>=0.24"
+]
+
 [project.scripts]
 faristol = "faristol.bin.faristol:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.setuptools.packages.find]
 where = ["."]
