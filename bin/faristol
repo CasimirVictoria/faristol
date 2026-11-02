@@ -25,12 +25,6 @@ def is_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex((host, port)) == 0
 
-def find_available_port(preferred_port=8080) -> int:
-    port = preferred_port
-    while is_port_in_use(port):
-        port += 1
-    return port
-
 def obrir_navegador(url: str):
     time.sleep(1.0)
     print(f"\n🌐 Obrint Faristol a: {url}\n")
@@ -102,22 +96,28 @@ def main():
             query_param = f"?doc={urllib.parse.quote(p.name)}"
 
     port = args.port
-    port_ocupat = is_port_in_use(port, host=args.host)
+    # '0.0.0.0', '::' o '*' són adreces d'escolta vàlides però no navegables:
+    # per a l'usuari i el navegador fem servir sempre una adreça concreta.
+    host_mostrar = "127.0.0.1" if args.host in ("0.0.0.0", "::", "::0", "*", "") else args.host
+    port_ocupat = is_port_in_use(port, host=host_mostrar)
 
     # Si ja hi ha un Faristol corrent al port, simplement obrir el navegador a la URL i sortir
     if port_ocupat:
-        url = f"http://{args.host}:{port}/{query_param}"
+        url = f"http://{host_mostrar}:{port}/{query_param}"
         print(f"ℹ️ Faristol ja s'està executant al port {port}.")
         if not args.no_browser:
             obrir_navegador(url)
         return
 
     # Si no està corrent, preparar URL i llançar uvicorn
-    url = f"http://{args.host}:{port}/{query_param}"
+    url = f"http://{host_mostrar}:{port}/{query_param}"
     if not args.no_browser:
         threading.Thread(target=obrir_navegador, args=(url,), daemon=True).start()
 
-    print(f"🚀 Iniciant servidor Faristol a http://{args.host}:{port}...")
+    if args.host == host_mostrar:
+        print(f"🚀 Iniciant servidor Faristol a http://{host_mostrar}:{port}...")
+    else:
+        print(f"🚀 Iniciant servidor Faristol a http://{host_mostrar}:{port} (escolta a {args.host}:{port})...")
     import uvicorn
     uvicorn.run("faristol.server:app", host=args.host, port=port, log_level="info")
 

@@ -5,7 +5,6 @@ import os
 import sys
 import re
 import json
-import glob
 import shutil
 import asyncio
 import time
@@ -14,10 +13,10 @@ import urllib.parse
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Request, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from faristol.config import (
@@ -29,7 +28,6 @@ from faristol.config import (
     HIGHLIGHTS_FILE
 )
 from faristol.utils import (
-    enviar_a_la_papelera,
     netejar_text_slug,
     detectar_tots_els_pdfs,
     extraure_pagines_nota,
@@ -482,7 +480,7 @@ async def restaurar_de_paperera(filename: str):
             try:
                 with bloqueig(BIB_FILE_PATH):
                     bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
-                    patro_com = re.compile(rf'((?:% TRASH: [^\n]*\n?)+)', re.MULTILINE)
+                    patro_com = re.compile(r'((?:% TRASH: [^\n]*\n?)+)', re.MULTILINE)
                     
                     def restore_match(m):
                         block = m.group(1)
@@ -532,7 +530,7 @@ async def eliminar_permanent_paperera(filename: str):
             try:
                 with bloqueig(BIB_FILE_PATH):
                     bib_text = BIB_FILE_PATH.read_text(encoding="utf-8")
-                    patro_com = re.compile(rf'\n*(?:% TRASH: [^\n]*\n?)+', re.MULTILINE)
+                    patro_com = re.compile(r'\n*(?:% TRASH: [^\n]*\n?)+', re.MULTILINE)
                     def remove_trash_block(m):
                         block = m.group(0)
                         if f"{{{citekey}," in block:
@@ -1994,10 +1992,6 @@ def _notificar_kate_sync():
     except Exception:
         pass
 
-def _carregar_colleccions() -> dict:
-    with bloqueig(COLLECTIONS_FILE):
-        return _llegir_colleccions_nolock()
-
 def _desar_colleccions(dades: dict):
     with bloqueig(COLLECTIONS_FILE):
         _escriure_colleccions_nolock(dades)
@@ -2318,8 +2312,28 @@ def _validar_id_nlm(val: str, camp: str = "id") -> str:
         raise HTTPException(status_code=400, detail=f"Paràmetre '{camp}' no vàlid")
     return net
 
+def _nlm_bin() -> Optional[str]:
+    """Resol l'executable de la CLI de NotebookLM ('nlm').
+
+    Ordre de prioritat: la variable d'entorn FARISTOL_NLM_BIN, el PATH del
+    sistema i, finalment, la ubicació habitual d'instal·lació per usuari
+    (~/.local/bin/nlm). Així no cal fixar cap ruta personal al codi.
+    """
+    override = os.environ.get("FARISTOL_NLM_BIN", "").strip()
+    if override:
+        return override
+    trobat = shutil.which("nlm")
+    if trobat:
+        return trobat
+    candidat = Path.home() / ".local" / "bin" / "nlm"
+    if candidat.is_file():
+        return str(candidat)
+    return None
+
 async def _exec_nlm_cli(args: List[str], parse_json: bool = True, timeout: float = 90.0):
-    nlm_bin = shutil.which("nlm") or "/home/casimir/.local/bin/nlm"
+    nlm_bin = _nlm_bin()
+    if not nlm_bin:
+        return False, "La comanda 'nlm' (NotebookLM CLI) no està instal·lada o no és al PATH.", None
     proc = None
     try:
         proc = await asyncio.create_subprocess_exec(

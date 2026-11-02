@@ -11,7 +11,7 @@ import tempfile
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Union, Optional
+from typing import Any, Union
 
 _THREAD_LOCKS: dict[str, threading.Lock] = {}
 _META_LOCK = threading.Lock()

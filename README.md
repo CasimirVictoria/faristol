@@ -225,6 +225,7 @@ Configuració i metadades auxiliars:
 - Python 3.10 o superior.
 - Navegador web modern (Firefox, Chromium, Brave).
 - Opcional: `okular` (visor natiu KDE), `kate` (editor natiu KDE), `nlm` (NotebookLM CLI).
+  - Faristol localitza `nlm` automàticament al `PATH` i, si no hi és, a `~/.local/bin/nlm`. Si el tens en un altre lloc, indica'l amb la variable d'entorn **`FARISTOL_NLM_BIN`** (p. ex. `Environment=FARISTOL_NLM_BIN=/ruta/a/nlm` a la unitat systemd).
 
 ### Instal·lació automàtica (amb servei Systemd)
 
