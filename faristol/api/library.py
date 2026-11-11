@@ -66,6 +66,11 @@ async def notificar_canvi_biblioteca(req: Optional[NotifyLibraryRequest] = None)
     payload = {"signature": sig, "event": "library-changed"}
     if req and req.doc:
         payload["doc"] = req.doc
+        try:
+            from faristol.api.rag import encuar_indexacio_fons
+            encuar_indexacio_fons([req.doc])
+        except Exception:
+            pass
     await broadcast_sse_event("change", payload)
     if req and req.doc:
         await broadcast_sse_event("open-document", {"doc": req.doc})

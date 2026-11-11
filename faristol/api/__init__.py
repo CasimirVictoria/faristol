@@ -7,12 +7,12 @@ principal amb el prefix ``/api``.
 """
 from fastapi import APIRouter
 
-from faristol.api import collections, library, nlm, notes, pdf, rag, search, workbench
+from faristol.api import collections, export, library, nlm, notes, pdf, rag, search, workbench
 
 router = APIRouter(prefix="/api")
 
 # L'orde de muntatge conserva l'orde original de les rutes.
-for _subrouter in (notes, pdf, library, search, workbench, collections, nlm, rag):
+for _subrouter in (notes, pdf, library, search, workbench, collections, nlm, rag, export):
     router.include_router(_subrouter.router)
 
 __all__ = ["router"]

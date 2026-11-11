@@ -331,6 +331,12 @@ pdf: "{clean_name}"
         with bloqueig(nota_path):
             escriure_atomic(nota_path, nota_content)
 
+    try:
+        from faristol.api.rag import encuar_indexacio_fons
+        encuar_indexacio_fons([clean_name, nota_name])
+    except Exception:
+        pass
+
     return {
         "status": "ok",
         "pdf": clean_name,
@@ -448,6 +454,12 @@ url: {json.dumps(url, ensure_ascii=False)}
 """
             with bloqueig(nota_path):
                 escriure_atomic(nota_path, nota_content)
+
+        try:
+            from faristol.api.rag import encuar_indexacio_fons
+            encuar_indexacio_fons([clean_name, nota_name])
+        except Exception:
+            pass
 
         return {
             "status": "ok",

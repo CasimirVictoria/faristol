@@ -91,12 +91,27 @@ class LocalRagQueryRequest(BaseModel):
     filenames: Optional[List[str]] = None
     collection_id: Optional[str] = None
     llm_model: Optional[str] = None
+    include_notes: bool = True
 
 
 class LocalRagIndexRequest(BaseModel):
     filenames: Optional[List[str]] = None
     collection_id: Optional[str] = None
     force: bool = False
+    include_notes: bool = True
+
+
+class NoteSummarizeRequest(BaseModel):
+    model: Optional[str] = None
+    overwrite: bool = False
+
+
+class ExportDocumentRequest(BaseModel):
+    filename: Optional[str] = None
+    title: str = "Document Faristol"
+    content: str
+    format: str = "pdf"  # "pdf", "html", "docx", "qmd"
+
 
 
 

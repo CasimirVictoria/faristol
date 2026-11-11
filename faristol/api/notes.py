@@ -7,17 +7,103 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 
 from faristol.api.common import _ruta_segura_nota, logger
 from faristol.api.models import GuardarNotaRequest, NovaNotaRequest
+from faristol.bibtex import GestorBibtex
 from faristol.config import BIB_FILE_PATH, FONTS_DIR, NOTAS_DIR, PAPERERA_DIR
 from faristol.fsatomic import bloqueig, escriure_atomic
 from faristol.utils import check_and_import_from_downloads, detectar_tots_els_pdfs, extraure_identificador_fitxer, extraure_pagines_nota, extraure_tags_nota, is_valid_pdf_content, netejar_text_slug
 
 router = APIRouter()
+
+# Memòria cau en RAM per mtime de notes: evita re-llegir N fitxers en llistar o calcular backlinks
+_NOTES_CACHE: Dict[str, dict] = {}
+_LAST_NOTAS_DIR_KEY: Optional[str] = None
+
+
+def _get_note_cached(path: Path) -> dict:
+    """Retorna metadades, text complet i enllaços d'una nota, rellegint només si ha canviat l'mtime."""
+    st = path.stat()
+    key = path.name
+    cached = _NOTES_CACHE.get(key)
+    if cached and cached["mtime"] == st.st_mtime and cached["size"] == st.st_size:
+        return cached
+
+    content = path.read_text(encoding="utf-8", errors="replace")
+    titol = _extreure_titol_nota(path, content[:1500])
+    tags = list(extraure_tags_nota(path.name, content))
+    pdfs = detectar_tots_els_pdfs(path, content)
+    has_pdf_doc = any(Path(p[1]).suffix.lower() == ".pdf" for p in pdfs)
+    has_html_doc = any(Path(p[1]).suffix.lower() in [".html", ".htm"] for p in pdfs)
+    doc_format = "pdf" if has_pdf_doc else ("html" if has_html_doc else "")
+
+    patrons_enllac = [
+        r'\[\[(?:denote:)?([^\]|\r\n]+)(?:\|[^\r\n\]]+)?(?:\]\[(.*?)\])?\]\]',
+        r'\[([^\]]+)\]\(([^)]+\.(?:md|org))\)',
+        r'\[@([a-zA-Z0-9_-]+)\]',
+    ]
+    enllacos_trobats = set()
+    for pat in patrons_enllac:
+        for m in re.finditer(pat, content, re.IGNORECASE):
+            target = m.group(1) if pat.startswith(r'\[\[') or pat.startswith(r'\[@') else m.group(2)
+            target = Path(target).name.lower().strip()
+            enllacos_trobats.add(target)
+            if not target.startswith('@'):
+                enllacos_trobats.add(f"@{target}")
+            else:
+                enllacos_trobats.add(target[1:])
+
+    entry = {
+        "filename": path.name,
+        "path": str(path.resolve()),
+        "title": titol,
+        "mtime": st.st_mtime,
+        "size": st.st_size,
+        "mtime_str": datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
+        "tags": tags,
+        "is_org": path.suffix.lower() == ".org",
+        "is_md": path.suffix.lower() == ".md",
+        "has_pdf": len(pdfs) > 0,
+        "pdf_count": len(pdfs),
+        "has_pdf_doc": has_pdf_doc,
+        "has_html_doc": has_html_doc,
+        "doc_format": doc_format,
+        "is_biblio": path.name.startswith("@"),
+        "content_lower": content.lower(),
+        "outlink_targets": enllacos_trobats,
+    }
+    _NOTES_CACHE[key] = entry
+    return entry
+
+
+def _sincronitzar_cache_notes() -> list[dict]:
+    """Assegura que _NOTES_CACHE reflecteix els fitxers presents a NOTAS_DIR."""
+    global _LAST_NOTAS_DIR_KEY
+    cur_key = str(NOTAS_DIR.resolve())
+    if _LAST_NOTAS_DIR_KEY != cur_key:
+        _NOTES_CACHE.clear()
+        _LAST_NOTAS_DIR_KEY = cur_key
+
+    actual_names = set()
+    items = []
+    for path in NOTAS_DIR.glob("*"):
+        if path.name.startswith((".", "#")) or path.name.endswith("~") or not path.is_file():
+            continue
+        if path.suffix.lower() not in [".md", ".org"]:
+            continue
+        try:
+            actual_names.add(path.name)
+            items.append(_get_note_cached(path))
+        except Exception:
+            continue
+
+    for stale in [k for k in _NOTES_CACHE if k not in actual_names]:
+        _NOTES_CACHE.pop(stale, None)
+    return items
 
 def _extreure_titol_nota(path: Path, contingut: str) -> str:
     """Extrau el títol d'una nota Markdown o Org."""
@@ -34,62 +120,60 @@ def _extreure_titol_nota(path: Path, contingut: str) -> str:
 
 @router.get("/notes")
 async def llistar_notes(q: Optional[str] = None, tag: Optional[str] = None):
-    """Retorna la llista de totes les notes disponibles amb metadades."""
+    """Retorna la llista de totes les notes disponibles (amb cerca full-text i enriquiment BibTeX des de memòria cau)."""
+    cached_items = _sincronitzar_cache_notes()
+
+    bib_by_key: Dict[str, dict] = {}
+    if BIB_FILE_PATH.exists():
+        for ref in GestorBibtex.carregar_referencies(BIB_FILE_PATH):
+            k = (ref.get("key") or "").strip().lower()
+            if k:
+                bib_by_key[k] = ref
+
     notes = []
     totes_les_tags = set()
+    q_terms = [t.lower().strip() for t in (q or "").split() if t.strip()]
 
-    for path in NOTAS_DIR.glob("*"):
-        if path.name.startswith((".", "#")) or path.name.endswith("~") or not path.is_file():
+    for entry in cached_items:
+        for t in entry["tags"]:
+            totes_les_tags.add(t)
+
+        if tag and tag.lower() not in [t.lower() for t in entry["tags"]]:
             continue
-        if path.suffix.lower() not in [".md", ".org"]:
-            continue
 
-        try:
-            stat = path.stat()
-            mtime = stat.st_mtime
-            mtime_dt = datetime.fromtimestamp(mtime)
-            mtime_str = mtime_dt.strftime("%Y-%m-%d %H:%M")
+        stem_low = extraure_identificador_fitxer(entry["filename"]).lower()
+        bib = bib_by_key.get(stem_low, {})
+        author = bib.get("author", "")
+        year = bib.get("year", "")
+        journal = bib.get("journal", "")
 
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                capcalera = f.read(1500)
-
-            titol = _extreure_titol_nota(path, capcalera)
-            tags = list(extraure_tags_nota(path.name, capcalera))
-            for t in tags:
-                totes_les_tags.add(t)
-
-            if q:
-                q_lower = q.lower()
-                if q_lower not in path.name.lower() and q_lower not in titol.lower():
-                    continue
-
-            if tag and tag.lower() not in [t.lower() for t in tags]:
+        if q_terms:
+            tags_str = " ".join(entry["tags"]).lower()
+            searchable_head = f"{entry['filename']} {entry['title']} {author} {year} {journal} {tags_str}".lower()
+            body_low = entry["content_lower"]
+            if not all((term in searchable_head or term in body_low) for term in q_terms):
                 continue
 
-            pdfs = detectar_tots_els_pdfs(path, capcalera)
-            has_pdf_doc = any(Path(p[1]).suffix.lower() == ".pdf" for p in pdfs)
-            has_html_doc = any(Path(p[1]).suffix.lower() in [".html", ".htm"] for p in pdfs)
-            doc_format = "pdf" if has_pdf_doc else ("html" if has_html_doc else "")
-
-            notes.append({
-                "filename": path.name,
-                "path": str(path.resolve()),
-                "title": titol,
-                "mtime": mtime,
-                "mtime_str": mtime_str,
-                "tags": tags,
-                "is_org": path.suffix.lower() == ".org",
-                "is_md": path.suffix.lower() == ".md",
-                "size": stat.st_size,
-                "has_pdf": len(pdfs) > 0,
-                "pdf_count": len(pdfs),
-                "has_pdf_doc": has_pdf_doc,
-                "has_html_doc": has_html_doc,
-                "doc_format": doc_format,
-                "is_biblio": path.name.startswith("@"),
-            })
-        except Exception:
-            continue
+        notes.append({
+            "filename": entry["filename"],
+            "path": entry["path"],
+            "title": entry["title"],
+            "mtime": entry["mtime"],
+            "mtime_str": entry["mtime_str"],
+            "tags": entry["tags"],
+            "is_org": entry["is_org"],
+            "is_md": entry["is_md"],
+            "size": entry["size"],
+            "has_pdf": entry["has_pdf"],
+            "pdf_count": entry["pdf_count"],
+            "has_pdf_doc": entry["has_pdf_doc"],
+            "has_html_doc": entry["has_html_doc"],
+            "doc_format": entry["doc_format"],
+            "is_biblio": entry["is_biblio"],
+            "author": author,
+            "year": year,
+            "journal": journal,
+        })
 
     notes.sort(key=lambda x: x["mtime"], reverse=True)
     return {
@@ -152,6 +236,13 @@ async def guardar_nota(filename: str, req: GuardarNotaRequest):
         with bloqueig(path):
             escriure_atomic(path, req.contingut)
 
+        _NOTES_CACHE.pop(filename, None)
+        try:
+            from faristol.api.rag import encuar_indexacio_fons
+            encuar_indexacio_fons([filename])
+        except Exception:
+            pass
+
         stat = path.stat()
         return {
             "status": "ok",
@@ -212,6 +303,13 @@ async def esborrar_nota(filename: str):
                 shutil.move(str(src_doc), str(dest_doc))
             except Exception as e_doc:
                 logger.warning(f"Error movent document associat {doc_name} a Paperera: {e_doc}")
+
+    _NOTES_CACHE.pop(path.name, None)
+    try:
+        from faristol.api.rag import eliminar_documents_del_rag
+        eliminar_documents_del_rag([path.name] + associated_docs)
+    except Exception:
+        pass
 
     # 4. Comentar o arxivar l'entrada a biblioteca.bib si és una cita bibliogràfica
     if path.name.startswith("@") and BIB_FILE_PATH.exists():
@@ -302,6 +400,7 @@ async def restaurar_de_paperera(filename: str):
     if src_note.is_file():
         dest_note = NOTAS_DIR / filename
         shutil.move(str(src_note), str(dest_note))
+        restored_files = [filename]
         
         # Restaurar documents associats
         stem = src_note.stem[1:] if src_note.name.startswith("@") else src_note.stem
@@ -309,6 +408,14 @@ async def restaurar_de_paperera(filename: str):
             cand = trash_docs_dir / f"{stem}{ext}"
             if cand.is_file():
                 shutil.move(str(cand), str(FONTS_DIR / cand.name))
+                restored_files.append(cand.name)
+
+        _NOTES_CACHE.pop(filename, None)
+        try:
+            from faristol.api.rag import encuar_indexacio_fons
+            encuar_indexacio_fons(restored_files)
+        except Exception:
+            pass
 
         # Descomentar a biblioteca.bib si correspon
         if src_note.name.startswith("@") and BIB_FILE_PATH.exists():
@@ -337,6 +444,11 @@ async def restaurar_de_paperera(filename: str):
     elif src_doc.is_file():
         dest_doc = FONTS_DIR / filename
         shutil.move(str(src_doc), str(dest_doc))
+        try:
+            from faristol.api.rag import encuar_indexacio_fons
+            encuar_indexacio_fons([filename])
+        except Exception:
+            pass
         return {"status": "ok", "message": f"{filename} restaurat correctament"}
 
     raise HTTPException(status_code=404, detail="Fitxer no trobat a la paperera")
@@ -443,6 +555,12 @@ async def moure_document_paperera(filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error movent document a la paperera: {e}")
 
+    try:
+        from faristol.api.rag import eliminar_documents_del_rag
+        eliminar_documents_del_rag([filename])
+    except Exception:
+        pass
+
     return {"status": "ok", "message": f"Document {filename} mogut a la paperera"}
 
 @router.post("/notes")
@@ -521,66 +639,42 @@ tags: {json.dumps(tags_list, ensure_ascii=False)}
 
 @router.get("/notes/{filename}/connections")
 async def obtenir_connexions(filename: str):
-    """Calcula els retroenllaços (backlinks) i enllaços sortints (outlinks) d'una nota."""
+    """Calcula els retroenllaços (backlinks) i enllaços sortints (outlinks) d'una nota usant memòria cau en RAM."""
     path_actual = _ruta_segura_nota(filename)
     if not path_actual.exists() or not path_actual.is_file():
         raise HTTPException(status_code=404, detail="Nota no trobada")
 
     try:
-        with open(path_actual, "r", encoding="utf-8", errors="replace") as f:
-            text_actual = f.read()
+        cached_items = _sincronitzar_cache_notes()
+        actual_entry = _get_note_cached(path_actual)
 
         id_actual = extraure_identificador_fitxer(filename).lower()
         stem_actual = Path(filename).stem.lower()
         nom_actual_lower = filename.lower()
+        enllacos_trobats = actual_entry["outlink_targets"]
 
         backlinks = []
-        for p in NOTAS_DIR.glob("*"):
-            if p.name == filename or p.name.startswith((".", "#")) or p.name.endswith("~") or not p.is_file():
-                continue
-            if p.suffix.lower() not in [".md", ".org"]:
-                continue
-            try:
-                with open(p, "r", encoding="utf-8", errors="replace") as f:
-                    c = f.read()
-                if (id_actual and id_actual in c.lower()) or nom_actual_lower in c.lower() or stem_actual in c.lower():
-                    backlinks.append({
-                        "filename": p.name,
-                        "title": _extreure_titol_nota(p, c[:1000])
-                    })
-            except Exception:
-                continue
-
-        patrons_enllac = [
-            r'\[\[(?:denote:)?([^\]|\r\n]+)(?:\|[^\r\n\]]+)?(?:\]\[(.*?)\])?\]\]',
-            r'\[([^\]]+)\]\(([^)]+\.(?:md|org))\)',
-            r'\[@([a-zA-Z0-9_-]+)\]',
-        ]
-        enllacos_trobats = set()
-        for pat in patrons_enllac:
-            for m in re.finditer(pat, text_actual, re.IGNORECASE):
-                target = m.group(1) if pat.startswith(r'\[\[') or pat.startswith(r'\[@') else m.group(2)
-                target = Path(target).name.lower().strip()
-                enllacos_trobats.add(target)
-                if not target.startswith('@'):
-                    enllacos_trobats.add(f"@{target}")
-                else:
-                    enllacos_trobats.add(target[1:])
-
         outlinks = []
-        for p in NOTAS_DIR.glob("*"):
-            if p.name == filename or p.suffix.lower() not in [".md", ".org"]:
-                continue
-            p_name_lower = p.name.lower()
-            p_id = extraure_identificador_fitxer(p.name).lower()
-            p_stem = p.stem.lower()
 
+        for entry in cached_items:
+            p_name = entry["filename"]
+            if p_name == filename:
+                continue
+
+            c_low = entry["content_lower"]
+            if (id_actual and id_actual in c_low) or nom_actual_lower in c_low or stem_actual in c_low:
+                backlinks.append({
+                    "filename": p_name,
+                    "title": entry["title"],
+                })
+
+            p_name_lower = p_name.lower()
+            p_id = extraure_identificador_fitxer(p_name).lower()
+            p_stem = Path(p_name).stem.lower()
             if p_name_lower in enllacos_trobats or (p_id and p_id in enllacos_trobats) or p_stem in enllacos_trobats:
-                with open(p, "r", encoding="utf-8", errors="replace") as f:
-                    c_target = f.read(1000)
                 outlinks.append({
-                    "filename": p.name,
-                    "title": _extreure_titol_nota(p, c_target)
+                    "filename": p_name,
+                    "title": entry["title"],
                 })
 
         backlinks.sort(key=lambda x: x["filename"])
