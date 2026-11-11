@@ -1414,8 +1414,8 @@
                     <button class="tab-btn active" id="tab-library-btn" title="Biblioteca completa: carpetes, notes i documents">
                         <i class="fa-solid fa-book-bookmark" style="color: var(--accent);"></i> <span>Biblioteca</span>
                     </button>
-                    <button class="tab-btn" id="tab-antigravity-btn" title="Assistent d'Intel·ligència Artificial Antigravity (agy-bridge)">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color: #a855f7;"></i> <span>IA</span>
+                    <button class="tab-btn" id="tab-antigravity-btn" title="RAG Híbrid Local (Docling + BM25 FTS5 + embeddinggemma-2)">
+                        <i class="fa-solid fa-bolt-lightning" style="color: #a855f7;"></i> <span>RAG Local</span>
                     </button>
                     <button class="tab-btn" id="tab-notebooklm-btn" title="Consultes a Google NotebookLM (RAG)">
                         <i class="fa-solid fa-brain" style="color: #38bdf8;"></i> <span>NotebookLM</span>
@@ -1636,43 +1636,89 @@
                 </div>
             </div>
 
-            <!-- Panell 4: Assistent IA Antigravity (agy-bridge) -->
+            <!-- Panell 2: RAG Híbrid Local (Docling + BM25 FTS5 + embeddinggemma-2) -->
             <div class="list-container" id="panel-antigravity-view" style="display: none; flex-direction: column; height: 100%; overflow: hidden; padding: 0;">
-                <div style="padding: 6px 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; font-size: 11px;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="color: #a855f7; font-size: 12px;"></i>
-                        <strong style="color: var(--text-main);">Antigravity IA</strong>
-                        <span id="antigravity-status-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 600; background: rgba(168, 85, 247, 0.12); color: #a855f7;">
-                            <i class="fa-solid fa-circle" style="font-size: 5px;"></i> <span>Verificant...</span>
+                <!-- Capçalera del RAG Local -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+                        <i class="fa-solid fa-bolt-lightning" style="color: #a855f7; font-size: 13px; flex-shrink: 0;"></i>
+                        <span id="rag-active-title" style="font-weight: 700; font-size: 12px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Abast actiu del RAG Local">Tota la Biblioteca</span>
+                        <span id="antigravity-status-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 600; background: rgba(168, 85, 247, 0.12); color: #a855f7; flex-shrink: 0;">
+                            <span>Carregant...</span>
                         </span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <button class="btn btn-sm btn-icon-only" id="btn-reload-antigravity" title="Recarregar xat d'Antigravity" style="padding: 2px 5px; font-size: 10px;">
+                    <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                        <button class="btn btn-sm" id="btn-rag-index-scope" title="Indexar documents pendents d'aquesta carpeta amb Docling + embeddinggemma-2" style="font-size: 10px; padding: 2px 6px; background: rgba(168, 85, 247, 0.14); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.35);">
+                            <i class="fa-solid fa-bolt"></i> <span>Indexar</span>
+                        </button>
+                        <button class="btn btn-sm btn-icon-only" id="btn-rag-new-chat" title="Netejar conversa del RAG Local" style="font-size: 10px; padding: 2px 5px;">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                        <button class="btn btn-sm btn-icon-only" id="btn-reload-antigravity" title="Actualitzar estat i fonts del RAG Local" style="font-size: 10px; padding: 2px 5px;">
                             <i class="fa-solid fa-rotate-right"></i>
                         </button>
-                        <a id="btn-open-antigravity-tab" href="http://localhost:8000" target="_blank" class="btn btn-sm btn-icon-only" title="Obrir en una pestanya nova" style="padding: 2px 5px; font-size: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted);">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                        </a>
                     </div>
                 </div>
 
-                <div id="antigravity-offline-alert" style="display: none; padding: 24px 16px; text-align: center; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--bg-surface);">
-                    <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 22px;">
-                        <i class="fa-solid fa-plug-circle-xmark"></i>
+                <!-- Barra de progrés d'indexació en segon pla -->
+                <div id="rag-indexing-banner" style="display: none; padding: 6px 10px; background: rgba(168, 85, 247, 0.1); border-bottom: 1px solid rgba(168, 85, 247, 0.25); font-size: 11px; color: var(--text-main); flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                        <span id="rag-indexing-text" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <i class="fa-solid fa-circle-notch fa-spin" style="color: #a855f7;"></i> Indexant amb Docling...
+                        </span>
+                        <span id="rag-indexing-pct" style="font-weight: 700; color: #a855f7; font-size: 10px;"></span>
                     </div>
-                    <div>
-                        <div style="font-weight: 600; font-size: 13px; color: var(--text-main); margin-bottom: 4px;">Servidor no detectat al port 8000</div>
-                        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; max-width: 280px; margin: 0 auto;">
-                            Assegura't que el servei <code>agy-bridge.service</code> s'està executant correctament.
+                </div>
+
+                <!-- Secció de Fonts Documentals del RAG Local -->
+                <div id="rag-sources-section" style="display: flex; flex-direction: column; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-subtle); font-size: 11px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-layer-group" style="color: #a855f7; font-size: 11px;"></i>
+                            <span id="rag-sources-count" style="font-weight: 600; color: var(--text-main);">Fonts (0)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <button id="btn-rag-toggle-all-sources" class="btn btn-xs" style="font-size: 10px; padding: 1px 6px; border: 1px solid var(--border-color); border-radius: 3px; background: var(--bg-surface); color: var(--text-muted); cursor: pointer;" title="Alternar selecció de totes les fonts">Totes</button>
+                            <button id="btn-rag-collapse-sources" class="btn btn-xs btn-icon-only" style="font-size: 10px; padding: 1px 4px; border: none; background: transparent; color: var(--text-muted); cursor: pointer;" title="Plegar / desplegar llista de fonts">
+                                <i class="fa-solid fa-chevron-up" id="icon-rag-collapse-sources"></i>
+                            </button>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-primary" id="btn-retry-antigravity" style="padding: 4px 12px; font-size: 11px; gap: 6px;">
-                        <i class="fa-solid fa-rotate"></i> Tornar a provar
-                    </button>
+                    <div id="rag-sources-list" style="max-height: 140px; overflow-y: auto; padding: 4px 6px; display: flex; flex-direction: column; gap: 2px;">
+                        <div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px 0;">Carregant fonts...</div>
+                    </div>
                 </div>
 
-                <div id="antigravity-frame-container" style="flex: 1; width: 100%; height: 100%; min-height: 0; position: relative; background: var(--bg-surface);">
-                    <iframe id="antigravity-frame" src="about:blank" style="width: 100%; height: 100%; border: none; display: block;" allow="clipboard-read; clipboard-write"></iframe>
+                <!-- Selector de Mode: Evidències Instantànies (~170ms) vs Síntesi IA Local (Ollama) -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-subtle); font-size: 10px; color: var(--text-muted); font-weight: 600; flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <button id="btn-rag-mode-evidences" class="btn btn-xs" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; border: 1px solid #a855f7; background: rgba(168, 85, 247, 0.16); color: #a855f7; font-weight: 700; cursor: pointer;" title="Recuperació híbrida instantània (~170ms) de fragments i taules sense al·lucinacions">
+                            ⚡ Evidències (~170ms)
+                        </button>
+                        <button id="btn-rag-mode-synthesis" class="btn btn-xs" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--border-color); background: transparent; color: var(--text-muted); font-weight: 600; cursor: pointer;" title="Síntesi redactada amb el model local d'Ollama (gemma4:e2b) i cites Pandoc">
+                            🧠 Síntesi IA
+                        </button>
+                    </div>
+                    <span id="rag-chat-scope-label" style="color: #a855f7; font-size: 10px;">Totes les fonts</span>
+                </div>
+
+                <!-- Historial de respostes i evidències del RAG Local -->
+                <div id="rag-chat-history" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 0;">
+                    <div id="rag-empty-state" style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 26px; padding: 0 10px;">
+                        <i class="fa-solid fa-bolt-lightning" style="font-size: 28px; color: #a855f7; opacity: 0.7; margin-bottom: 10px;"></i>
+                        <p style="margin: 0 0 6px 0; font-weight: 600; color: var(--text-main);">RAG Híbrid Local (Docling + BM25 + Gemma-2)</p>
+                        <p style="font-size: 11px; margin: 0; line-height: 1.4;">Cerca semàntica i lèxica 100% local sobre els teus PDFs i taules, amb citacions exactes <code>[@citekey, p. X]</code> i salt directe a la pàgina.</p>
+                    </div>
+                </div>
+
+                <!-- Caixa d'entrada de consultes del RAG Local -->
+                <div style="padding: 8px 10px; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-shrink: 0;">
+                    <div style="display: flex; gap: 6px; align-items: flex-end;">
+                        <textarea id="rag-chat-input" placeholder="Pregunta al RAG Local... (Enter per enviar)" rows="2" style="flex: 1; resize: none; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 8px; background: var(--bg-main); color: var(--text-main); line-height: 1.4; outline: none;"></textarea>
+                        <button id="btn-rag-send" class="btn btn-primary" title="Cercar al RAG Híbrid Local" style="padding: 6px 10px; height: 38px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: #a855f7; border-color: #a855f7;">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -2100,6 +2146,14 @@ const state = {
     nlmSources: [],
     nlmSelectedSourceIds: new Set(),
     nlmSourcesCollapsed: false,
+    // RAG Local (Docling + BM25 + embeddinggemma-2)
+    ragMode: 'evidences', // 'evidences' | 'synthesis'
+    ragSources: [],
+    ragSelectedFilenames: new Set(),
+    ragSourcesCollapsed: false,
+    ragChatMessages: [],
+    ragIsQuerying: false,
+    ragIndexingPollTimer: null,
 };
 
 // Elements DOM
@@ -5787,19 +5841,14 @@ function configurarEvents() {
     
     document.getElementById('btn-refresh-lib').onclick = carregarDadesBiblioteca;
 
-    // Controls Agent Antigravity
-    if (el.btnToggleAntigravityTab) {
-        el.btnToggleAntigravityTab.onclick = () => alternarPestanyaAntigravity(true);
+    // Controls RAG Local (substitueix Antigravity IA)
+    if (el.tabAntigravityBtn) {
+        el.tabAntigravityBtn.style.display = 'flex';
     }
     if (el.btnReloadAntigravity) {
-        el.btnReloadAntigravity.onclick = () => recarregarAntigravityFrame();
+        el.btnReloadAntigravity.onclick = () => carregarPanellAntigravity(true);
     }
-    if (el.btnRetryAntigravity) {
-        el.btnRetryAntigravity.onclick = () => comprovarEstatAntigravity(true);
-    }
-    if (el.tabAntigravityBtn) {
-        alternarPestanyaAntigravity(false);
-    }
+    inicialitzarEventsRagLocal();
 }
 
 function togglePanellPdf() {
@@ -6881,96 +6930,623 @@ window.addEventListener('popstate', (e) => {
     }
 });
 
-// --- Funcions Agent Antigravity ---
-let antigravityInitialCheckDone = false;
+// --- Funcions RAG Híbrid Local (Docling + BM25 FTS5 + embeddinggemma-2) ---
 
-function alternarPestanyaAntigravity(manualToggle = false) {
-    if (!el.tabAntigravityBtn) return;
-    let show = localStorage.getItem('faristol_show_antigravity_tab');
-    if (show === null) {
-        show = '0'; // Per defecte desactivat
-    }
-    
-    if (manualToggle) {
-        show = (show === '1') ? '0' : '1';
-        localStorage.setItem('faristol_show_antigravity_tab', show);
-    }
-
-    const isVisible = (show === '1');
+function alternarPestanyaAntigravity() {
     if (el.tabAntigravityBtn) {
-        el.tabAntigravityBtn.style.display = isVisible ? 'flex' : 'none';
-    }
-    if (el.btnToggleAntigravityTab) {
-        el.btnToggleAntigravityTab.style.color = isVisible ? '#8b5cf6' : 'var(--text-muted)';
-        el.btnToggleAntigravityTab.style.borderColor = isVisible ? 'rgba(139, 92, 246, 0.4)' : 'transparent';
-        el.btnToggleAntigravityTab.title = isVisible 
-            ? "Ocultar pestanya de l'Agent Antigravity (Alt+A)" 
-            : "Mostrar pestanya de l'Agent Antigravity (Alt+A)";
-    }
-
-    // Si s'amaga i l'usuari tenia activa la pestanya d'antigravity, tornar a notes
-    if (!isVisible && state.activeTab === 'antigravity') {
-        canviarPestanya('notes');
+        el.tabAntigravityBtn.style.display = 'flex';
     }
 }
 
-async function comprovarEstatAntigravity(force = false) {
-    if (!el.antigravityStatusBadge) return;
-    
-    el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #f59e0b;"></i> <span>Verificant...</span>';
-    
-    const targetHost = window.location.hostname || 'localhost';
-    const agyUrl = `http://${targetHost}:8000/`;
-
-    const openLink = document.getElementById('btn-open-antigravity-tab');
-    if (openLink) {
-        openLink.href = agyUrl;
-    }
-
-    try {
-        await fetch(agyUrl, { mode: 'no-cors', cache: 'no-store' });
-        el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #10b981;"></i> <span style="color: #10b981;">En línia</span>';
-        if (el.antigravityOfflineAlert) el.antigravityOfflineAlert.style.display = 'none';
-        if (el.antigravityFrameContainer) el.antigravityFrameContainer.style.display = 'block';
-
-        if (el.antigravityFrame) {
-            const currentSrc = el.antigravityFrame.getAttribute('src');
-            if (force || !currentSrc || currentSrc === 'about:blank' || !currentSrc.includes(targetHost)) {
-                el.antigravityFrame.onload = () => notificarTemaAntigravity();
-                el.antigravityFrame.src = agyUrl;
-            } else {
-                notificarTemaAntigravity();
-            }
-        }
-        antigravityInitialCheckDone = true;
-    } catch (err) {
-        console.warn(`Antigravity server no detectat a ${agyUrl}:`, err);
-        el.antigravityStatusBadge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 5px; color: #ef4444;"></i> <span style="color: #ef4444;">Desconnectat</span>';
-        if (el.antigravityOfflineAlert) el.antigravityOfflineAlert.style.display = 'flex';
-        if (el.antigravityFrameContainer) el.antigravityFrameContainer.style.display = 'none';
-    }
-}
-
-function carregarPanellAntigravity() {
-    if (!antigravityInitialCheckDone || !el.antigravityFrame || el.antigravityFrame.getAttribute('src') === 'about:blank') {
-        comprovarEstatAntigravity(false);
-    }
+function notificarTemaAntigravity() {
+    // Més net: el panell RAG Local és natiu i hereta les variables CSS del tema automàticament
 }
 
 function recarregarAntigravityFrame() {
-    comprovarEstatAntigravity(true);
+    carregarPanellAntigravity(true);
 }
 
-function notificarTemaAntigravity(tema) {
-    const isDark = tema ? (tema === 'dark') : (document.documentElement.classList.contains('dark-theme') || document.body.classList.contains('dark-theme'));
-    const iframe = document.getElementById('antigravity-frame');
-    if (iframe && iframe.contentWindow) {
-        try {
-            iframe.contentWindow.postMessage({ type: 'set-theme', theme: isDark ? 'dark' : 'light' }, '*');
-        } catch (e) {
-            console.warn("No s'ha pogut notificar el tema a Antigravity:", e);
-        }
+function obtenirNomAbastRag() {
+    if (!state.activeCollectionId) return 'Tota la Biblioteca';
+    if (state.activeCollectionId === 'unfiled') return 'Sense arxivar';
+    if (state.activeCollectionId === 'trash') return 'Paperera';
+    const col = (state.collections || []).find(c => c.id === state.activeCollectionId);
+    return col ? col.name : 'Tota la Biblioteca';
+}
+
+function inicialitzarEventsRagLocal() {
+    const btnSend = document.getElementById('btn-rag-send');
+    const chatInput = document.getElementById('rag-chat-input');
+    const btnNewChat = document.getElementById('btn-rag-new-chat');
+    const btnIndexScope = document.getElementById('btn-rag-index-scope');
+    const btnToggleAll = document.getElementById('btn-rag-toggle-all-sources');
+    const btnCollapse = document.getElementById('btn-rag-collapse-sources');
+    const btnModeEv = document.getElementById('btn-rag-mode-evidences');
+    const btnModeSyn = document.getElementById('btn-rag-mode-synthesis');
+
+    if (btnSend) {
+        btnSend.onclick = () => enviarRagPregunta();
     }
+    if (chatInput) {
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                enviarRagPregunta();
+            }
+        });
+    }
+    if (btnNewChat) {
+        btnNewChat.onclick = () => {
+            state.ragChatMessages = [];
+            renderitzarRagChat();
+        };
+    }
+    if (btnIndexScope) {
+        btnIndexScope.onclick = () => iniciarIndexacioRagLocal(false);
+    }
+    if (btnToggleAll) {
+        btnToggleAll.onclick = () => {
+            const total = state.ragSources.length;
+            const sel = state.ragSelectedFilenames.size;
+            if (sel === total && total > 0) {
+                state.ragSelectedFilenames.clear();
+            } else {
+                state.ragSources.forEach(s => state.ragSelectedFilenames.add(s.filename));
+            }
+            renderitzarFontsRagLocal();
+        };
+    }
+    if (btnCollapse) {
+        btnCollapse.onclick = () => {
+            state.ragSourcesCollapsed = !state.ragSourcesCollapsed;
+            const listEl = document.getElementById('rag-sources-list');
+            const iconEl = document.getElementById('icon-rag-collapse-sources');
+            if (listEl) listEl.style.display = state.ragSourcesCollapsed ? 'none' : 'flex';
+            if (iconEl) iconEl.className = state.ragSourcesCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+        };
+    }
+    if (btnModeEv && btnModeSyn) {
+        const actualizarEstilModes = () => {
+            const isEv = state.ragMode === 'evidences';
+            btnModeEv.style.borderColor = isEv ? '#a855f7' : 'var(--border-color)';
+            btnModeEv.style.background = isEv ? 'rgba(168, 85, 247, 0.16)' : 'transparent';
+            btnModeEv.style.color = isEv ? '#a855f7' : 'var(--text-muted)';
+            btnModeEv.style.fontWeight = isEv ? '700' : '600';
+
+            btnModeSyn.style.borderColor = !isEv ? '#a855f7' : 'var(--border-color)';
+            btnModeSyn.style.background = !isEv ? 'rgba(168, 85, 247, 0.16)' : 'transparent';
+            btnModeSyn.style.color = !isEv ? '#a855f7' : 'var(--text-muted)';
+            btnModeSyn.style.fontWeight = !isEv ? '700' : '600';
+        };
+        btnModeEv.onclick = () => { state.ragMode = 'evidences'; actualizarEstilModes(); };
+        btnModeSyn.onclick = () => { state.ragMode = 'synthesis'; actualizarEstilModes(); };
+    }
+}
+
+async function carregarPanellAntigravity() {
+    const titleEl = document.getElementById('rag-active-title');
+    if (titleEl) {
+        const nom = obtenirNomAbastRag();
+        titleEl.textContent = nom;
+        titleEl.title = `Abast actiu: ${nom}`;
+    }
+    await carregarFontsRagLocal();
+    await comprovarEstatRagLocal();
+    renderitzarRagChat();
+}
+
+async function comprovarEstatRagLocal() {
+    const badgeEl = document.getElementById('antigravity-status-badge');
+    const bannerEl = document.getElementById('rag-indexing-banner');
+    const textEl = document.getElementById('rag-indexing-text');
+    const pctEl = document.getElementById('rag-indexing-pct');
+
+    try {
+        const res = await fetch('/api/rag/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        const totalChunks = (data.vector_store && data.vector_store.total_chunks) || 0;
+        const idxDocs = data.indexed_files_count || 0;
+        const idxState = data.indexing || {};
+
+        if (badgeEl) {
+            badgeEl.innerHTML = `<i class="fa-solid fa-database" style="font-size: 9px;"></i> <span>${idxDocs} docs · ${totalChunks} ch.</span>`;
+            badgeEl.title = `Model: ${data.embedding_model} | Total: ${idxDocs} documents indexats (${totalChunks} fragments)`;
+        }
+
+        if (idxState.active) {
+            if (bannerEl) bannerEl.style.display = 'block';
+            if (textEl) {
+                textEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin" style="color: #a855f7;"></i> ${escapeHtml(idxState.message || 'Indexant...')}`;
+            }
+            if (pctEl && idxState.total > 0) {
+                pctEl.textContent = `${idxState.done}/${idxState.total}`;
+            }
+            if (!state.ragIndexingPollTimer) {
+                state.ragIndexingPollTimer = setInterval(async () => {
+                    await comprovarEstatRagLocal();
+                    await carregarFontsRagLocal();
+                }, 2000);
+            }
+        } else {
+            if (state.ragIndexingPollTimer) {
+                clearInterval(state.ragIndexingPollTimer);
+                state.ragIndexingPollTimer = null;
+                await carregarFontsRagLocal();
+            }
+            if (bannerEl) bannerEl.style.display = 'none';
+        }
+    } catch (err) {
+        console.warn('Error comprovant estat RAG Local:', err);
+    }
+}
+
+async function carregarFontsRagLocal() {
+    const colId = (state.activeCollectionId && state.activeCollectionId !== 'trash') ? state.activeCollectionId : '';
+    const tag = state.activeTagFilter || '';
+    try {
+        const params = new URLSearchParams();
+        if (colId) params.set('collection_id', colId);
+        if (tag) params.set('tag', tag);
+        const res = await fetch(`/api/rag/sources?${params.toString()}`);
+        if (res.ok) {
+            const data = await res.json();
+            const prevCount = state.ragSources.length;
+            state.ragSources = data.sources || [];
+            if (prevCount === 0 || state.ragSelectedFilenames.size === 0) {
+                state.ragSelectedFilenames = new Set(state.ragSources.map(s => s.filename));
+            } else {
+                const validSet = new Set(state.ragSources.map(s => s.filename));
+                for (const fn of Array.from(state.ragSelectedFilenames)) {
+                    if (!validSet.has(fn)) state.ragSelectedFilenames.delete(fn);
+                }
+                if (state.ragSelectedFilenames.size === 0 && state.ragSources.length > 0) {
+                    state.ragSelectedFilenames = new Set(state.ragSources.map(s => s.filename));
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error carregant fonts del RAG Local:', err);
+    }
+    renderitzarFontsRagLocal();
+}
+
+function renderitzarFontsRagLocal() {
+    const listEl = document.getElementById('rag-sources-list');
+    const countEl = document.getElementById('rag-sources-count');
+    const scopeEl = document.getElementById('rag-chat-scope-label');
+    const toggleBtn = document.getElementById('btn-rag-toggle-all-sources');
+    const inputEl = document.getElementById('rag-chat-input');
+
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    const total = state.ragSources.length;
+    const selCount = state.ragSelectedFilenames.size;
+    const idxCount = state.ragSources.filter(s => s.indexed).length;
+
+    if (countEl) {
+        countEl.textContent = `Fonts (${selCount}/${total} · ${idxCount} indexades)`;
+    }
+    if (scopeEl) {
+        if (total === 0) scopeEl.textContent = 'Sense fonts';
+        else if (selCount === total) scopeEl.textContent = `Totes (${total})`;
+        else scopeEl.textContent = `${selCount} de ${total} fonts`;
+    }
+    if (inputEl) {
+        const nomAbast = obtenirNomAbastRag();
+        inputEl.placeholder = `Pregunta a ${nomAbast} (${selCount} fonts)... (Enter per enviar)`;
+    }
+    if (toggleBtn) {
+        toggleBtn.textContent = (selCount === total && total > 0) ? 'Cap' : 'Totes';
+    }
+
+    if (total === 0) {
+        listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 8px 0;">Cap document en aquesta carpeta.</div>`;
+        return;
+    }
+
+    state.ragSources.forEach(s => {
+        const isSelected = state.ragSelectedFilenames.has(s.filename);
+        const item = document.createElement('div');
+        item.className = `nlm-source-item${isSelected ? ' selected' : ''}`;
+
+        const isHtml = s.type === 'html';
+        const iconClass = isHtml ? 'fa-globe' : 'fa-file-pdf';
+        const iconColor = isHtml ? '#38bdf8' : '#ef4444';
+        const statusBadge = s.indexed
+            ? `<span title="Indexat amb Docling (${s.chunk_count} fragments)" style="font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(16, 185, 129, 0.14); color: #10b981; font-weight: 600; flex-shrink: 0;">✓ ${s.chunk_count}</span>`
+            : `<button class="btn btn-xs rag-index-one-btn" title="Indexar aquest document ara" style="font-size: 9px; padding: 1px 5px; border-radius: 3px; background: rgba(245, 158, 11, 0.16); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); cursor: pointer; flex-shrink: 0;">⚡ Indexar</button>`;
+
+        item.innerHTML = `
+            <input type="checkbox" class="nlm-source-checkbox" ${isSelected ? 'checked' : ''} style="margin: 0; cursor: pointer; flex-shrink: 0;">
+            <i class="fa-solid ${iconClass}" style="color: ${iconColor}; font-size: 11px; flex-shrink: 0;"></i>
+            <span class="nlm-source-title" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px;" title="${escapeHtml(s.title)} (${escapeHtml(s.filename)})">${escapeHtml(s.filename)}</span>
+            ${statusBadge}
+            <button class="btn btn-xs btn-icon-only nlm-open-pdf-btn" title="Obrir document al visor central" style="font-size: 10px; padding: 1px 4px; opacity: 0.75;"><i class="fa-solid fa-book-open"></i></button>
+        `;
+
+        const chk = item.querySelector('.nlm-source-checkbox');
+        chk.addEventListener('change', (e) => {
+            e.stopPropagation();
+            if (chk.checked) state.ragSelectedFilenames.add(s.filename);
+            else state.ragSelectedFilenames.delete(s.filename);
+            renderitzarFontsRagLocal();
+        });
+
+        const indexOneBtn = item.querySelector('.rag-index-one-btn');
+        if (indexOneBtn) {
+            indexOneBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                iniciarIndexacioRagLocal(false, [s.filename]);
+            });
+        }
+
+        const openBtn = item.querySelector('.nlm-open-pdf-btn');
+        if (openBtn) {
+            openBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                obrirPdf(s.filename, true);
+            });
+        }
+
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.nlm-open-pdf-btn') || e.target.closest('.rag-index-one-btn') || e.target === chk) return;
+            chk.checked = !chk.checked;
+            if (chk.checked) state.ragSelectedFilenames.add(s.filename);
+            else state.ragSelectedFilenames.delete(s.filename);
+            renderitzarFontsRagLocal();
+        });
+
+        listEl.appendChild(item);
+    });
+}
+
+async function iniciarIndexacioRagLocal(force = false, explicitFiles = null) {
+    const filesToIndex = explicitFiles || Array.from(state.ragSelectedFilenames);
+    if (!filesToIndex || filesToIndex.length === 0) {
+        alert('Selecciona almenys un document per indexar.');
+        return;
+    }
+    try {
+        const res = await fetch('/api/rag/index', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filenames: filesToIndex,
+                collection_id: state.activeCollectionId,
+                force: force,
+            }),
+        });
+        await res.json();
+        await comprovarEstatRagLocal();
+    } catch (err) {
+        console.error('Error iniciant indexació RAG Local:', err);
+    }
+}
+
+async function enviarRagPregunta(text) {
+    const inputEl = document.getElementById('rag-chat-input');
+    const query = (text || (inputEl ? inputEl.value : '')).trim();
+    if (!query) return;
+
+    if (state.ragSources.length > 0 && state.ragSelectedFilenames.size === 0) {
+        alert('Selecciona almenys un document de la llista per consultar el RAG Local.');
+        return;
+    }
+
+    if (inputEl) inputEl.value = '';
+
+    state.ragChatMessages.push({
+        role: 'user',
+        text: query,
+        mode: state.ragMode,
+        sourcesCount: state.ragSelectedFilenames.size,
+        totalSources: state.ragSources.length,
+    });
+    state.ragIsQuerying = true;
+    renderitzarRagChat();
+
+    try {
+        const res = await fetch('/api/rag/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: query,
+                mode: state.ragMode,
+                top_k: 6,
+                filenames: Array.from(state.ragSelectedFilenames),
+                collection_id: state.activeCollectionId,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error consultant el RAG Local');
+
+        state.ragChatMessages.push({
+            role: 'assistant',
+            text: data.answer || 'Sense resposta.',
+            took_ms: data.took_ms || 0,
+            mode: data.mode || state.ragMode,
+            citations: data.citations || {},
+            citation_details: data.citation_details || {},
+            references: data.references || [],
+            sources: data.sources || {},
+        });
+    } catch (err) {
+        console.error('Error en consulta RAG Local:', err);
+        state.ragChatMessages.push({
+            role: 'assistant',
+            text: `⚠️ **Error en el RAG Local:** ${err.message}`,
+        });
+    } finally {
+        state.ragIsQuerying = false;
+        renderitzarRagChat();
+    }
+}
+
+function generarMarkdownPurRag(msgIndex, includeHeader = false) {
+    const msg = state.ragChatMessages[msgIndex];
+    if (!msg || !msg.text) return '';
+
+    let userQuery = '';
+    if (msgIndex > 0 && state.ragChatMessages[msgIndex - 1].role === 'user') {
+        userQuery = state.ragChatMessages[msgIndex - 1].text.trim();
+    }
+
+    const scopeTitle = obtenirNomAbastRag();
+    const textFormatted = convertirCitacionsAPandoc(msg.text, msg.citations, msg.sources, false, msg.citation_details);
+    const evidenciesMd = formatarEvidenciesMarkdown(msg.references);
+
+    let md = '';
+    if (includeHeader) {
+        const headerTitle = userQuery ? `### RAG Local: ${userQuery}` : `### RAG Local (${scopeTitle})`;
+        md += `${headerTitle}\n\n`;
+    }
+    md += `${textFormatted}\n`;
+    if (evidenciesMd) {
+        md += `\n#### Evidències i cites del PDF:\n\n${evidenciesMd}\n`;
+    }
+    return md;
+}
+
+async function crearNovaNotaDesDeRag(msgIndex) {
+    const msg = state.ragChatMessages[msgIndex];
+    if (!msg || !msg.text) return;
+
+    let userQuery = '';
+    if (msgIndex > 0 && state.ragChatMessages[msgIndex - 1].role === 'user') {
+        userQuery = state.ragChatMessages[msgIndex - 1].text.trim();
+    }
+
+    const scopeTitle = obtenirNomAbastRag();
+    const defaultTitle = userQuery ? `RAG Local: ${userQuery}` : `Síntesi RAG (${scopeTitle})`;
+    const titol = prompt("Títol de la nova nota de síntesi:", defaultTitle);
+    if (!titol || !titol.trim()) return;
+
+    const titolNet = titol.trim();
+    const textFormatted = convertirCitacionsAPandoc(msg.text, msg.citations, msg.sources, false, msg.citation_details);
+    const evidenciesMd = formatarEvidenciesMarkdown(msg.references);
+
+    const avui = new Date().toISOString().slice(0, 10);
+    let contingut = `---
+title: "${titolNet.replace(/"/g, '\\"')}"
+date: ${avui}
+tags: ["sintesi", "rag-local"]
+---
+
+# ${titolNet}
+
+${userQuery ? `> **Pregunta:** ${userQuery}\n\n` : ''}${textFormatted}
+`;
+
+    if (evidenciesMd) {
+        contingut += `\n## Evidències i cites del PDF\n\n${evidenciesMd}\n`;
+    }
+
+    try {
+        const res = await fetch('/api/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                titol: titolNet,
+                tags: "sintesi rag-local",
+                contingut: contingut
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Error creant la nota");
+
+        const filename = data.filename;
+        if (state.activeCollectionId && state.activeCollectionId !== 'unfiled' && state.activeCollectionId !== 'trash') {
+            await afegirItemAColleccio(state.activeCollectionId, 'note', filename);
+        }
+
+        const notesRes = await fetch('/api/notes');
+        if (notesRes.ok) {
+            const notesData = await notesRes.json();
+            state.notes = notesData.notes || [];
+            if (el.notesCount) el.notesCount.textContent = state.notes.length;
+            renderitzarLlistaNotes();
+        }
+
+        await obrirNota(filename);
+        canviarPestanya('notes');
+        actualitzarEstatGuardat('saved', `Nota '${titolNet}' creada`);
+    } catch (err) {
+        console.error("Error creant nota des de RAG Local:", err);
+        alert(`Error en crear la nota: ${err.message}`);
+    }
+}
+
+function renderitzarRagChat() {
+    const histEl = document.getElementById('rag-chat-history');
+    if (!histEl) return;
+    histEl.innerHTML = '';
+
+    if (state.ragChatMessages.length === 0 && !state.ragIsQuerying) {
+        const scopeNom = obtenirNomAbastRag();
+        histEl.innerHTML = `
+            <div id="rag-empty-state" style="text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 26px; padding: 0 10px;">
+                <i class="fa-solid fa-bolt-lightning" style="font-size: 28px; color: #a855f7; opacity: 0.7; margin-bottom: 10px;"></i>
+                <p style="margin: 0 0 6px 0; font-weight: 600; color: var(--text-main);">RAG Híbrid Local (${escapeHtml(scopeNom)})</p>
+                <p style="font-size: 11px; margin: 0; line-height: 1.4;">
+                    Motor <b>Docling + BM25 FTS5 + embeddinggemma-2</b> en NumPy float32.<br>
+                    Fes clic a qualsevol cita <code>[@citekey, p. X]</code> per obrir el PDF a la pàgina exacta.
+                </p>
+            </div>
+        `;
+        return;
+    }
+
+    state.ragChatMessages.forEach((msg, idx) => {
+        if (msg.role === 'user') {
+            const div = document.createElement('div');
+            div.className = 'nlm-msg-user';
+            div.style.background = 'rgba(168, 85, 247, 0.16)';
+            div.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+            div.textContent = msg.text;
+            const badge = document.createElement('div');
+            badge.style.cssText = 'font-size: 9px; opacity: 0.85; margin-top: 4px; font-style: italic; text-align: right;';
+            badge.textContent = `${msg.mode === 'synthesis' ? '🧠 Síntesi IA' : '⚡ Evidències'} · ${msg.sourcesCount}/${msg.totalSources} fonts`;
+            div.appendChild(badge);
+            histEl.appendChild(div);
+        } else {
+            const div = document.createElement('div');
+            div.className = 'nlm-msg-assistant';
+
+            if (msg.took_ms) {
+                const metaTop = document.createElement('div');
+                metaTop.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-size: 9.5px; color: var(--text-muted); margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed var(--border-subtle);';
+                metaTop.innerHTML = `<span><i class="fa-solid fa-bolt-lightning" style="color: #a855f7;"></i> ${msg.mode === 'synthesis' ? 'Híbrid + Ollama' : 'Híbrid BM25 + Vector'}</span><span style="font-family: monospace; color: #a855f7; font-weight: 600;">${msg.took_ms} ms</span>`;
+                div.appendChild(metaTop);
+            }
+
+            const bodyDiv = document.createElement('div');
+            bodyDiv.innerHTML = formatMarkdownNlm(msg.text, msg.citations, msg.sources, msg.citation_details);
+            div.appendChild(bodyDiv);
+
+            if (msg.references && msg.references.length > 0) {
+                const refsBlock = document.createElement('div');
+                refsBlock.className = 'nlm-references-section';
+                refsBlock.style.cssText = 'margin-top: 10px; padding: 8px 10px; background: var(--bg-subtle, rgba(255,255,255,0.03)); border-radius: 6px; border: 1px solid var(--border-subtle, rgba(255,255,255,0.08)); font-size: 11px;';
+
+                const refsHeader = document.createElement('div');
+                refsHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-weight: 600; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;';
+                refsHeader.innerHTML = `<span><i class="fa-solid fa-quote-left" style="color: #a855f7; margin-right: 4px;"></i> Fragments verificats al PDF (${msg.references.length})</span>`;
+                refsBlock.appendChild(refsHeader);
+
+                const refsList = document.createElement('div');
+                refsList.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+
+                msg.references.forEach((ref) => {
+                    const refItem = document.createElement('div');
+                    refItem.className = 'nlm-reference-item';
+                    refItem.style.cssText = 'display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; background: var(--bg-card, rgba(255,255,255,0.02)); border: 1px solid var(--border-subtle, rgba(255,255,255,0.05)); border-radius: 5px; cursor: pointer; transition: background 0.15s, border-color 0.15s;';
+                    refItem.onmouseenter = () => { refItem.style.borderColor = '#a855f7'; refItem.style.background = 'rgba(168, 85, 247, 0.08)'; };
+                    refItem.onmouseleave = () => { refItem.style.borderColor = 'var(--border-subtle, rgba(255,255,255,0.05))'; refItem.style.background = 'var(--bg-card, rgba(255,255,255,0.02))'; };
+
+                    const pnum = ref.page || 1;
+                    const pdfName = ref.pdf || 'Document';
+                    const citekey = ref.citekey || 'ref';
+                    const cleanCite = ref.cited_text ? ref.cited_text.replace(/\s+/g, ' ').trim() : '';
+                    const shortCite = cleanCite.length > 180 ? cleanCite.slice(0, 180) + '...' : cleanCite;
+                    const ctxLabel = ref.context ? `<div style="font-size: 9.5px; color: #a855f7; font-weight: 600;">📂 ${escapeHtml(ref.context)}</div>` : '';
+
+                    refItem.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+                            <span style="font-family: monospace; font-weight: 600; color: #a855f7;">
+                                <i class="fa-solid fa-file-pdf" style="color: #ef4444; margin-right: 4px;"></i>[@${escapeHtml(citekey)}, p. ${pnum}]
+                            </span>
+                            <span style="font-size: 10px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px;">
+                                <span style="max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(pdfName)}</span>
+                                <i class="fa-solid fa-arrow-up-right-from-square" style="color: #a855f7; font-size: 9px;" title="Saltar a la pàgina ${pnum}"></i>
+                            </span>
+                        </div>
+                        ${ctxLabel}
+                        ${cleanCite ? `<div style="font-size: 10.5px; color: var(--text-muted); font-style: italic; line-height: 1.35; padding-left: 6px; border-left: 2px solid #a855f7;">«${escapeHtml(shortCite)}»</div>` : ''}
+                    `;
+                    refItem.onclick = () => saltarACitacioNlm(pdfName, pnum, cleanCite);
+                    refsList.appendChild(refItem);
+                });
+
+                refsBlock.appendChild(refsList);
+                div.appendChild(refsBlock);
+            }
+
+            // Accions: Crear nota, Inserir a la nota, Copiar
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'nlm-msg-actions';
+
+            const btnNewNote = document.createElement('button');
+            btnNewNote.className = 'nlm-action-btn';
+            btnNewNote.innerHTML = '<i class="fa-solid fa-file-circle-plus" style="color: #4ade80;"></i> Crear nota';
+            btnNewNote.title = 'Crear una nova nota Markdown a la biblioteca amb aquesta resposta i cites [@citekey, p. X]';
+            btnNewNote.onclick = () => crearNovaNotaDesDeRag(idx);
+            actionsDiv.appendChild(btnNewNote);
+
+            const btnInsert = document.createElement('button');
+            btnInsert.className = 'nlm-action-btn';
+            btnInsert.innerHTML = '<i class="fa-solid fa-file-import" style="color: #a855f7;"></i> Inserir a la nota';
+            btnInsert.title = 'Inserir aquesta resposta i cites [@citekey, p. X] a la nota oberta';
+            btnInsert.onclick = () => {
+                const snippet = generarMarkdownPurRag(idx, true);
+                inserirTextAlCursor(`\n\n${snippet}\n`);
+                actualitzarEstatGuardat('unsaved', 'Resposta RAG inserida');
+            };
+            actionsDiv.appendChild(btnInsert);
+
+            const btnCopy = document.createElement('button');
+            btnCopy.className = 'nlm-action-btn';
+            btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar';
+            btnCopy.onclick = async () => {
+                try {
+                    const textMd = generarMarkdownPurRag(idx, false);
+                    await navigator.clipboard.writeText(textMd);
+                    btnCopy.innerHTML = '<i class="fa-solid fa-check" style="color: #4ade80;"></i> Copiat!';
+                    setTimeout(() => { btnCopy.innerHTML = '<i class="fa-solid fa-copy"></i> Copiar'; }, 1500);
+                } catch (e) {
+                    console.error('Error copiant resposta RAG:', e);
+                }
+            };
+            actionsDiv.appendChild(btnCopy);
+
+            div.appendChild(actionsDiv);
+            histEl.appendChild(div);
+        }
+    });
+
+    if (!histEl._hasCitationClick) {
+        histEl._hasCitationClick = true;
+        histEl.addEventListener('click', (e) => {
+            const pageLink = e.target.closest('.nlm-page-link');
+            if (pageLink && pageLink.dataset.pdf) {
+                e.preventDefault();
+                e.stopPropagation();
+                saltarACitacioNlm(pageLink.dataset.pdf, parseInt(pageLink.dataset.page, 10) || 1, pageLink.dataset.cited || '');
+                return;
+            }
+            const badge = e.target.closest('.nlm-citation-badge.pandoc');
+            if (badge && badge.dataset.pdf) {
+                e.preventDefault();
+                e.stopPropagation();
+                saltarACitacioNlm(badge.dataset.pdf, parseInt(badge.dataset.page, 10) || 1, badge.dataset.cited || '');
+            }
+        });
+    }
+
+    if (state.ragIsQuerying) {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'nlm-msg-assistant';
+        loadingDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; color: #a855f7; font-size: 11px;">
+                <i class="fa-solid fa-bolt fa-beat-fade"></i>
+                <span>${state.ragMode === 'synthesis' ? 'Recuperant i sintetitzant amb Ollama...' : 'Cercant al RAG Híbrid Local (BM25 + embeddinggemma-2)...'}</span>
+            </div>
+        `;
+        histEl.appendChild(loadingDiv);
+    }
+
+    histEl.scrollTop = histEl.scrollHeight;
 }
 
 // --- Gestió del Tema (Clar per defecte / Fosc) ---

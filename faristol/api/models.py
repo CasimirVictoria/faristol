@@ -84,3 +84,19 @@ class NlmSintesiRequest(BaseModel):
     origen: str
 
 
+class LocalRagQueryRequest(BaseModel):
+    query: str
+    mode: str = "evidences"  # "evidences" (~170ms hybrid) or "synthesis" (hybrid + local LLM)
+    top_k: int = 6
+    filenames: Optional[List[str]] = None
+    collection_id: Optional[str] = None
+    llm_model: Optional[str] = None
+
+
+class LocalRagIndexRequest(BaseModel):
+    filenames: Optional[List[str]] = None
+    collection_id: Optional[str] = None
+    force: bool = False
+
+
+
