@@ -21,22 +21,22 @@ Faristol presenta una interfície web moderna de **maquetació en mosaic (tiling
 │ PLAFÓ LATERAL   │       PLAFÓ CENTRAL           │         PLAFÓ DRET            │
 │                 │                               │                               │
 │ [📚 Biblioteca] │   Visor PDF.js personalitzat  │   Editor Markdown (Vditor)    │
-│ [🤖 IA (agy)]   │   - Subratllat persistent     │   - Metadades Denote (YAML)   │
+│ [⚡ RAG Local]   │   - Subratllat persistent     │   - Metadades Denote (YAML)   │
 │ [🎙️ NotebookLM]│   - Cerca exacta multilínia   │   - Renderitzat KaTeX ($E=mc²)│
 │ [🌐 Cerca (35)] │   - Extracció d'anotacions    │   - Cites Pandoc [@citekey]   │
-│                 │   - Salts des de la nota      │   - Backlinks i xarxa         │
-│                 │                               │                               │
+│                 │   - Salts des de la nota      │   - Backlinks i Semàntica ✨  │
+│                 │                               │   - Auto-Resum IA & Exportació│
 │                 │   ⇄ Intercanvi F7: Editor al centre / PDF a la dreta          │
 └─────────────────┴───────────────────────────────┴───────────────────────────────┘
 ```
 
 1. **Plafó lateral de navegació unificada:**
-   - **📚 Biblioteca:** Gestió de col·leccions jeràrquiques, explorador de notes i PDFs unificats 1-a-1, cercador instantani.
-   - **🤖 IA (Antigravity agy-bridge):** Copilot d'enginyeria i investigació en viu incrustat (port 8000), sincronitzat en tema clar/fosc, amb KaTeX LaTeX, execució de codi i visor de terminal.
+   - **📚 Biblioteca:** Gestió de col·leccions jeràrquiques, explorador de notes i PDFs unificats 1-a-1, creació ràpida de notes personals (`+ Nota`) i cercador instantani amb cerca full-text i BibTeX.
+   - **⚡ RAG Local (Híbrid Docling + BM25 FTS5 + embeddinggemma-2):** Motor 100% local i sobirà de recuperació i síntesi en streaming SSE (< 2 ms en matriu NumPy float32) sobre PDFs, captures HTML i notes Markdown.
    - **🎙️ NotebookLM:** Estudi de recerca i generació d'àudio (RAG) amb exportació directa de respostes a Markdown pur amb cites a pàgina exacta.
    - **🌐 Cerca Acadèmica (35 motors):** Cerca federada en paral·lel mitjançant `mcp-server-academic-spain` i descàrrega en 1 clic amb `add-paper`.
-2. **Visor de PDF central (PDF.js personalitzat):** Renderitzat fluid, subratllat persistent, cerca exacta multilínia que creua salts de paràgraf, navegació per pàgines i extracció automàtica de cites textuals.
-3. **Editor de notes (Vditor Markdown):** Editor WYSIWYG/Markdown amb suport complet per a KaTeX (fórmules matemàtiques), etiquetes `#tags`, retroenllaços bidireccionals (*backlinks/outlinks*), citacions Pandoc `[@citekey, p. X]` i salts instantanis a la pàgina exacta del PDF.
+2. **Visor de PDF central (PDF.js personalitzat):** Renderitzat fluid, subratllat persistent, cerca exacta multilínia que creua salts de paràgraf, navegació per pàgines i extracció automàtica de cites textuals (amb obertura neta per defecte sense barra lateral d'esquema).
+3. **Editor de notes (Vditor Markdown):** Editor WYSIWYG/Markdown amb suport complet per a KaTeX (fórmules matemàtiques), etiquetes `#tags`, retroenllaços bidireccionals (*backlinks/outlinks*), connexions semàntiques automàtiques (`✨ XX%`), citacions Pandoc `[@citekey, p. X]`, generació de **Resum IA** en 1 clic i **Exportació acadèmica** a Quarto (`.qmd`), PDF (XeLaTeX), HTML i Word (`.docx`).
 
 ---
 
@@ -120,13 +120,28 @@ flowchart TD
 - **Mode Lectura (per defecte):** PDF al centre per a una lectura reposada i editor de notes a la dreta per anotar idees.
 - **Mode Redacció intensiva:** Prem `F7` o el botó `⇄` per situar l'editor Markdown al centre en gran format, deixant el PDF a la dreta com a panell lateral de consulta.
 
-### 3. Panell d'Intel·ligència Artificial Integrat (Antigravity `agy-bridge`)
-- Accés immediat al teu agent d'IA sobirà des de la pestanya **[ 🤖 IA ]**.
-- Integració directa amb `agy-bridge` (port 8000).
-- Suport per a consultes de programació, resolució de càlculs, anàlisi de dades, execució de terminals remotes i renderitzat KaTeX LaTeX.
-- **Sincronització de Tema Clar / Fosc:** El canvi de tema a Faristol (`Alt + T`) es propaga automàticament a la interfície de la IA.
+### 3. RAG Híbrid Local (Docling + BM25 FTS5 + embeddinggemma-2 en NumPy float32)
+Faristol integra un motor de **RAG Local Híbrid d'alta velocitat** a la pestanya lateral **[ ⚡ RAG Local ]**, que permet consultar la totalitat de la biblioteca (documents PDF, captures HTML i notes personals) sense dependre de servidors externs:
+- **Indexació amb Docling:** Extracció precisa d'estructures, taules i jerarquia de documents.
+- **Cerca Híbrida (Recíproca / RRF):** Combina el motor lèxic **SQLite FTS5 (BM25)** amb embeddings semàntics **`embeddinggemma-2`** calculats en memòria RAM sobre una matriu **NumPy float32** (< 2 ms de latència per consulta).
+- **Dos modes de consulta:**
+  - **⚡ Evidències:** Recuperació directa i instantània (~50-150 ms) dels fragments més rellevants amb puntuació de confiança, sense passar per cap model generatiu.
+  - **🧠 Síntesi IA (Streaming SSE):** Síntesi rigorosa amb streaming token a token (`event: metadata`, `token`, `done`) mitjançant models locals d'Ollama (`gemma4:e2b`, `qwen3.5:4b`, etc.) o models externs.
+- **Cites interactives amb salt al PDF o nota:** Totes les respostes inclouen insígnies `[@citekey, p. X]` o `[@nota]`; en fer clic, Faristol salta a la pàgina exacta del PDF o obre la nota associada a l'editor.
+- **Accions immediates:** Botons per a *Crear nota nova* amb la síntesi i les cites, *Inserir a la nota activa* al punt del cursor, o *Copiar* el Markdown net al porta-retalls.
+- **Autoindexació en segon pla:** En desar o crear una nota, pujar un PDF o capturar un URL, Faristol encoa automàticament la indexació incremental en segon pla sense bloquejar la interfície.
+- **Sincronització amb la Paperera:** En moure un document o nota a la Paperera, es purguen automàticament els seus vectors i entrades de `vectors.db`.
 
-### 4. Xat de Recerca amb Google NotebookLM (RAG sobre Documents)
+### 4. Auto-Resum IA i Exportador Acadèmic Quarto / Pandoc
+A la barra d'eines de l'editor de notes:
+- **✨ Resum IA (`resumirNotaActualAmbRag`):** Genera automàticament en un clic un resum executiu i 4-6 idees clau fonamentades en el PDF indexat, respectant el frontmatter YAML existent de la nota.
+- **📤 Menú d'Exportació (`/api/export/document`):**
+  - **Quarto Markdown (`.qmd`):** Exporta la nota neta estructurada per a compilació de llibres o informes científics.
+  - **PDF Acadèmic (XeLaTeX + Pandoc):** Compilació directa amb `pandoc --citeproc --pdf-engine=xelatex`, resolent totes les cites de la nota contra el fitxer canònic `biblioteca.bib`.
+  - **HTML Autocontingut (`--embed-resources`):** Informe web independent amb estils i recursos incrustats.
+  - **Document Word (`.docx`):** Format editable per a tràmits administratius o col·laboracions.
+
+### 5. Xat de Recerca amb Google NotebookLM (RAG al Núvol per Projectes)
 Faristol integra directament l'estudi de recerca i generació d'àudio de **Google NotebookLM** mitjançant el client `nlm` a la pestanya lateral **[ 🎙️ NotebookLM ]**:
 
 - **Quaderns temàtics per col·lecció:** Connecta les teues carpetes d'estudi amb els seus quaderns corresponents de NotebookLM (ex: *Creativitat*, *Pensament Computacional*, *Filosofia*).
@@ -136,12 +151,12 @@ Faristol integra directament l'estudi de recerca i generació d'àudio de **Goog
 - **Citacions numèriques interactives amb salt al PDF:** Cada afirmació de NotebookLM inclou citacions de font; en fer clic sobre qualsevol cita, **Faristol obre automàticament el PDF corresponent al visor central i salta a la pàgina exacta** ressaltant el text d'evidència.
 - **Injecció a la nota i síntesi transversal:** Pots injectar la resposta de la IA directament a la teua nota oberta o exportar la conversa sencera a Markdown pur. Això crea automàticament retroenllaços bidireccionals que apareixen a la secció inferior **«Connexions de la nota»** vinculant la literatura analitzada.
 
-### 5. Cerca Acadèmica Federada en 35 Motors
+### 6. Cerca Acadèmica Federada en 35 Motors
 - Pestanya **[ 🌐 Cerca ]** connectada a `mcp-server-academic-spain`.
 - Consulta en paral·lel a repositoris nacionals i internacionals: Dialnet, OpenAlex, CSIC, arXiv, PubMed, ERIC, SciELO, DOAJ, DBLP, Recolecta, TDX, etc.
 - **Importació en 1 clic:** descàrrega en accés obert, registre BibTeX i creació de nota instantània mitjançant `add-paper`.
 
-### 6. Visor Dual de Documents: PDFs i Snapshots HTML Autèntics
+### 7. Visor Dual de Documents: PDFs i Snapshots HTML Autèntics
 Faristol no es limita als documents PDF: és un visor universal tant per a documents PDF com per a **captures web completes en format HTML (SingleFile)**:
 - **Lectura d'Snapshots HTML autèntics:** Carrega directament pàgines web arxivades conservant la tipografia, imatges, gràfics interactius i maquetació original del web.
 - **Subratllat interactiu persistent:** Funciona exactament igual en PDFs que en HTML; selecciona qualsevol text al document HTML i fes clic a **«Subratllar»** (el text queda destacat amb `mark.faristol-highlight` i es manté guardat).
@@ -149,13 +164,19 @@ Faristol no es limita als documents PDF: és un visor universal tant per a docum
 - **Sincronització bidireccional:** En fer clic a una citació o fragment de text a la nota, Faristol realitza un desplaçament (*scroll*) suau i automàtic al panell central fins al paràgraf exacte, tant si és un PDF com un arxiu HTML.
 - **Cerca multilínia d'alta precisió:** Troba termes i oracions que creuen salts de paràgraf o guionets de tall.
 
-### 7. Editor Markdown Ric (Vditor)
+### 8. Editor Markdown Ric (Vditor) amb Connexions Semàntiques
 - Format en temps real, mode pantalla dividida o mode codi font pur.
 - Renderitzat matemàtic complet amb KaTeX (`$E = mc^2$`).
 - Metadades Denote YAML netes (`title`, `authors`, `year`, `citekey`, `tags`).
-- Gràfic de retroenllaços (*backlinks*) per a navegació tipus Zettelkasten.
+- **Calaix de Connexions:** Mostra enllaços sortints, mencions entrants (*backlinks*) i **Connexions Semàntiques automàtiques (`✨ XX%`)** calculades en temps real per similitud de cosinus sobre la matriu vectorial.
+- **Creació de Notes Pròpies (sense `@`):** Botó `+ Nota` a la biblioteca i barra superior per a crear notes personals Denote cronològiques amb plantilles (*Lliure en blanc*, *Concepte atòmic*, *Estat de l'art*, *Diari*) i etiquetatge flexible.
+- **Cerca Full-Text i BibTeX en RAM:** Memòria cau `_NOTES_CACHE` amb invalidació per `mtime`/`size` que respon a cerques en mil·lisegons sense bloquejar el disc.
 
-### 8. Ubiquitat Mòbil i Accés Remot (via Tailscale)
+### 9. Actius 100% Locals i Arquitectura Modular (Zero CDNs)
+- Tots els recursos web (`FontAwesome 6.5.1` amb les seues 8 fonts locals, `marked.min.js`, `Vditor`, `PDF.js`, `Plotly`, `KaTeX`) s'allotgen a `faristol/static/libs/`, garantint funcionament fluid fins i tot en xarxes aïllades o sense connexió.
+- Codi frontend estructurat modularment a `static/css/faristol.css`, `static/js/app.js` i `static/js/rag_and_export.js`.
+
+### 10. Ubiquitat Mòbil i Accés Remot (via Tailscale)
 - **Accés des de qualsevol lloc:** Gràcies a la xarxa privada xifrada de **Tailscale**, pots accedir a Faristol (`http://<IP-Tailscale>:8080`) des del telèfon mòbil, tauleta o portàtil estigues on estigues (amb dades 4G/5G, a la universitat o fora de casa), sense exposar cap port a Internet pública.
 - **Captura d'Articles Web amb SingleFile des d'Android:**
   - Configurant l'extensió **SingleFile** a Firefox Android (Destinació ➔ *Upload to a REST Form API* ➔ `http://<IP-Tailscale>:23119/singlefile`), en prémer la icona de SingleFile al telèfon es capturen automàticament **dues versions alhora**:
@@ -205,15 +226,20 @@ faristol/
 │   ├── __init__.py      # Router principal (/api) que agrega els subrouters
 │   ├── common.py        # Logger i validació estricta de rutes (_ruta_segura_nota, _document_segur)
 │   ├── models.py        # Models Pydantic de les peticions
-│   ├── notes.py         # Notes, paperera, connexions i subratllats
+│   ├── notes.py         # Notes (Denote/sense @), paperera, connexions i cerca full-text
 │   ├── pdf.py           # Streaming de PDF i subratllats
+│   ├── rag.py           # RAG Híbrid Local (Docling + BM25 + embeddinggemma-2 + SSE stream)
+│   ├── export.py        # Exportador Quarto (.qmd), PDF (XeLaTeX), HTML i Word
 │   ├── library.py       # Biblioteca, fonts, esdeveniments SSE i BibTeX
 │   ├── search.py        # Cerca acadèmica federada, Zotero-less i MCP local
 │   ├── workbench.py     # Accions del banc de treball (integració externa)
 │   ├── collections.py   # Col·leccions virtuals
 │   └── nlm.py           # NotebookLM (RAG)
 ├── config.py  utils.py  bibtex.py  fsatomic.py
-└── static/              # Interfície web (HTML/CSS/JS, Vditor, PDF.js, KaTeX)
+└── static/              # Interfície web 100% offline (HTML, CSS modular, JS, Vditor, PDF.js, KaTeX)
+    ├── css/faristol.css
+    ├── js/app.js
+    └── js/rag_and_export.js
 ```
 
 ### 🏷️ La Convenció de l'Arroba (`@`): Notes Bibliogràfiques vs. Notes Pròpies

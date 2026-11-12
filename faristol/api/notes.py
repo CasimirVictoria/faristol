@@ -604,7 +604,8 @@ citekey: "@{clean_stem}"
         return {"status": "created", "filename": nom_fitxer, "path": str(path_fitxer.resolve())}
 
     slug = netejar_text_slug(titol_clean)
-    tags_list = [netejar_text_slug(t) for t in req.tags.split() if t.strip()]
+    tags_list = [netejar_text_slug(t) for t in re.split(r"[\s,]+", req.tags.strip()) if t.strip()]
+    tags_list = [t for t in tags_list if t]
     str_tags = "_" + "_".join(tags_list) if tags_list else ""
     id_denote = ara.strftime("%Y%m%dT%H%M%S")
     nom_fitxer = f"{id_denote}--{slug}{str_tags}.md"
@@ -620,7 +621,8 @@ citekey: "@{clean_stem}"
     if req.contingut:
         contingut = req.contingut
     else:
-        contingut = f"""---
+        tpl = (req.template or req.plantilla or "lliure").strip().lower()
+        frontmatter = f"""---
 title: {json.dumps(titol_clean, ensure_ascii=False)}
 date: {avui}
 tags: {json.dumps(tags_list, ensure_ascii=False)}
@@ -629,6 +631,14 @@ tags: {json.dumps(tags_list, ensure_ascii=False)}
 # {titol_clean}
 
 """
+        if tpl == "concept":
+            contingut = frontmatter + "## Idea principal\n\n\n## Connexions i exemples\n\n"
+        elif tpl == "estat_art":
+            contingut = frontmatter + "## Resum\n\n\n## Idees clau\n\n- \n\n## Referències i cites\n\n"
+        elif tpl == "diari":
+            contingut = frontmatter + "## Notes del dia\n\n\n## Pròxims passos\n\n- [ ] \n"
+        else:
+            contingut = frontmatter
     with bloqueig(path_fitxer):
         escriure_atomic(path_fitxer, contingut)
     return {

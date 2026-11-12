@@ -2261,7 +2261,9 @@ async function obrirPdf(filename, obrirNotaAssociada = true, paginaInicial = 1, 
         el.pdfFrame.removeAttribute('sandbox');
     }
     const streamUrl = `/api/pdf/stream?path=${encodeURIComponent(filename)}&_t=${Date.now()}`;
-    const pageHash = (paginaInicial && paginaInicial > 1) ? `#page=${paginaInicial}&zoom=page-width` : '#zoom=page-width';
+    const pageHash = (paginaInicial && paginaInicial > 1)
+        ? `#page=${paginaInicial}&zoom=page-width&pagemode=none`
+        : '#zoom=page-width&pagemode=none';
     const viewerUrl = isHtmlSnap
         ? streamUrl
         : `/static/libs/pdfjs_dist/web/viewer.html?file=${encodeURIComponent(streamUrl)}&nom_pdf=${encodeURIComponent(filename)}${pageHash}`;
@@ -3791,10 +3793,32 @@ function configurarEvents() {
     if (btnSwapEd) btnSwapEd.onclick = toggleSwapPanells;
     
     // Modals
-    document.getElementById('btn-new-note').onclick = () => {
+    const obrirModalNovaNota = () => {
+        const titleEl = document.getElementById('new-note-title');
+        const tagsEl = document.getElementById('new-note-tags');
+        const tplEl = document.getElementById('new-note-template');
+        if (titleEl) titleEl.value = '';
+        if (tagsEl) tagsEl.value = '';
+        if (tplEl) tplEl.value = 'lliure';
         document.getElementById('modal-new-note').style.display = 'flex';
-        document.getElementById('new-note-title').focus();
+        if (titleEl) titleEl.focus();
     };
+    const btnNewNote = document.getElementById('btn-new-note');
+    if (btnNewNote) btnNewNote.onclick = obrirModalNovaNota;
+    const btnNewNoteSidebar = document.getElementById('btn-new-note-sidebar');
+    if (btnNewNoteSidebar) btnNewNoteSidebar.onclick = obrirModalNovaNota;
+
+    ['new-note-title', 'new-note-tags'].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) {
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    crearNovaNota();
+                }
+            });
+        }
+    });
     
     document.getElementById('btn-import-pdf').onclick = () => {
         document.getElementById('modal-import-pdf').style.display = 'flex';
@@ -4437,16 +4461,24 @@ async function crearNovaNota() {
             body: JSON.stringify({
                 titol: title,
                 tags: tags,
+                plantilla: template,
                 template: template
             })
         });
         
         if (!res.ok) throw new Error("Error creant la nota");
         const data = await res.json();
+
+        if (data.filename && state.activeCollectionId && state.activeCollectionId !== 'unfiled' && state.activeCollectionId !== 'trash') {
+            await afegirItemAColleccio(state.activeCollectionId, 'note', data.filename);
+        }
         
-        await carregarDadesBiblioteca();
+        await carregarDadesBiblioteca(true);
         if (data.filename) {
-            obrirNota(data.filename);
+            await obrirNota(data.filename);
+            if (el.panelEditor && el.panelEditor.classList.contains('collapsed')) {
+                el.panelEditor.classList.remove('collapsed');
+            }
         }
     } catch (e) {
         alert(`Error creant la nota: ${e.message}`);

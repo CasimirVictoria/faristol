@@ -11,7 +11,8 @@ class GuardarNotaRequest(BaseModel):
 class NovaNotaRequest(BaseModel):
     titol: str
     tags: str = ""
-    plantilla: str = "estat_art"
+    plantilla: str = "lliure"
+    template: Optional[str] = None
     contingut: Optional[str] = None
 
 class SaveHighlightRequest(BaseModel):

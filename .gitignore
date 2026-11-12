@@ -13,3 +13,8 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+*.env
+.env
+*.db
+*.sqlite
+*.sqlite3
