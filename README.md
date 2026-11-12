@@ -112,13 +112,15 @@ flowchart TD
 
 ## ✨ Característiques Principals
 
-### 1. Maquetació en Mosaic (Tiling) sense Marges Grisos
+### 1. Maquetació en Mosaic (Tiling) sense Marges Grisos i Panells Plegables
 - Aprofita el 100% de la resolució del teu monitor amb panells acoblats i redimensionables.
 - **Barra de carpetes superior permanent:** Permet filtrar la biblioteca per col·leccions o temes amb un sol clic sense perdre l'espai de lectura.
+- **Mostrar / Amagar Panells (Sense distraccions):** Cadascun dels tres panells (Plafó Lateral de Biblioteca, Visor Central i Editor de Notes) es pot plegar o desplegar a voluntat amb botons discrets de col·lapse (`◀` / `▶`). Pots deixar el visor de PDF a pantalla completa per a lectura immersiva, o l'editor Markdown aïllat per a redacció sense elements visuals que distraguen.
 
 ### 2. Intercanvi Dinàmic de Panells (`F7` / `Alt + W`)
-- **Mode Lectura (per defecte):** PDF al centre per a una lectura reposada i editor de notes a la dreta per anotar idees.
-- **Mode Redacció intensiva:** Prem `F7` o el botó `⇄` per situar l'editor Markdown al centre en gran format, deixant el PDF a la dreta com a panell lateral de consulta.
+- **Mode Lectura (per defecte):** Document (PDF o web) al centre per a una lectura reposada i editor de notes a la dreta per anotar idees.
+- **Mode Redacció intensiva:** Prem `F7` o el botó `⇄ Intercanviar` per situar l'editor Markdown al centre en gran format, deixant el PDF a la dreta com a panell lateral de consulta ràpida.
+- Canvia de disposició a l'instant amb una sola drecera sense recarregar la pàgina ni perdre la posició de lectura.
 
 ### 3. RAG Híbrid Local (Docling + BM25 FTS5 + embeddinggemma-2 en NumPy float32)
 Faristol integra un motor de **RAG Local Híbrid d'alta velocitat** a la pestanya lateral **[ ⚡ RAG Local ]**, que permet consultar la totalitat de la biblioteca (documents PDF, captures HTML i notes personals) sense dependre de servidors externs:
@@ -156,12 +158,13 @@ Faristol integra directament l'estudi de recerca i generació d'àudio de **Goog
 - Consulta en paral·lel a repositoris nacionals i internacionals: Dialnet, OpenAlex, CSIC, arXiv, PubMed, ERIC, SciELO, DOAJ, DBLP, Recolecta, TDX, etc.
 - **Importació en 1 clic:** descàrrega en accés obert, registre BibTeX i creació de nota instantània mitjançant `add-paper`.
 
-### 7. Visor Dual de Documents: PDFs i Snapshots HTML Autèntics
-Faristol no es limita als documents PDF: és un visor universal tant per a documents PDF com per a **captures web completes en format HTML (SingleFile)**:
-- **Lectura d'Snapshots HTML autèntics:** Carrega directament pàgines web arxivades conservant la tipografia, imatges, gràfics interactius i maquetació original del web.
-- **Subratllat interactiu persistent:** Funciona exactament igual en PDFs que en HTML; selecciona qualsevol text al document HTML i fes clic a **«Subratllar»** (el text queda destacat amb `mark.faristol-highlight` i es manté guardat).
-- **Extracció de cites directes:** En seleccionar text en un PDF o en un Snapshot HTML, el menú flotant permet prémer **«Citar»** per injectar automàticament la cita textual a l'editor de notes Markdown de la dreta.
-- **Sincronització bidireccional:** En fer clic a una citació o fragment de text a la nota, Faristol realitza un desplaçament (*scroll*) suau i automàtic al panell central fins al paràgraf exacte, tant si és un PDF com un arxiu HTML.
+### 7. Visor Dual de Documents: PDFs i Captures Web HTML (Estil Zotero)
+Faristol replica i supera la comoditat de lectura de Zotero portant-la al món del text pla i del web obert, servint com a visor universal tant per a documents PDF com per a **captures web completes en format HTML (SingleFile)**:
+- **Captura d'Articles Web (SingleFile / Zotero Connector):** Quan arxives una pàgina web mitjançant l'extensió SingleFile o mitjançant el Zotero Connector (emulat pel dimoni `zoterless`), Faristol en guarda una còpia autèntica autònoma (`.html`) juntament amb la seua nota Markdown associada (`@{citekey}.md`).
+- **Lectura d'Snapshots HTML autèntics:** Carrega directament la pàgina web arxivada conservant la tipografia, imatges, taules, gràfics interactius i la maquetació original del lloc web, sense trencar l'estil ni dependre de connexió a internet.
+- **Subratllat interactiu persistent (com als PDFs de Zotero):** Funciona exactament igual en PDFs que en arxius HTML; selecciona qualsevol text al document web i fes clic al menú flotant **«Subratllar»** (el text queda destacat amb ressaltat persistent i es desa automàticament a `highlights.json`).
+- **Extracció de cites directes a la nota:** En seleccionar text en un PDF o en una pàgina web HTML, prem **«Citar»** per a injectar automàticament la cita textual a l'editor Markdown amb la seua referència canònica.
+- **Sincronització bidireccional:** En fer clic a una citació o fragment a la nota, Faristol desplaça el document central (*scroll* suau) fins al paràgraf exacte, tant si és una pàgina de PDF com una secció d'una captura web HTML.
 - **Cerca multilínia d'alta precisió:** Troba termes i oracions que creuen salts de paràgraf o guionets de tall.
 
 ### 8. Editor Markdown Ric (Vditor) amb Connexions Semàntiques
@@ -176,7 +179,11 @@ Faristol no es limita als documents PDF: és un visor universal tant per a docum
 - Tots els recursos web (`FontAwesome 6.5.1` amb les seues 8 fonts locals, `marked.min.js`, `Vditor`, `PDF.js`, `Plotly`, `KaTeX`) s'allotgen a `faristol/static/libs/`, garantint funcionament fluid fins i tot en xarxes aïllades o sense connexió.
 - Codi frontend estructurat modularment a `static/css/faristol.css`, `static/js/app.js` i `static/js/rag_and_export.js`.
 
-### 10. Ubiquitat Mòbil i Accés Remot (via Tailscale)
+### 10. Ubiquitat Mòbil, Adaptació Automàtica de la Interfície i Accés Remot (Tailscale)
+- **Adaptació Automàtica al Mòbil / Tauleta (`< 900px`):**
+  - Quan s'accedeix des d'un telèfon o pantalla tàctil estreta, Faristol transforma automàticament la maquetació en mosaic en una **experiència monoparafó nativa**: només es mostra un dels tres panells alhora per aprofitar al màxim l'espai de pantalla.
+  - **Barra inferior de navegació fixa:** Permet alternar amb el polze entre **[ 📚 Biblioteca ]**, **[ 📖 Lectura ]** (visor PDF/web) i **[ 📝 Nota ]** (editor Markdown).
+  - **Navegació intel·ligent per acció:** En prémer qualsevol PDF o pàgina web de la biblioteca, la interfície salta automàticament a la pestanya *Lectura*; en obrir o crear una nota pròpia (`+ Nota`), salta directament a l'editor de *Nota*.
 - **Accés des de qualsevol lloc:** Gràcies a la xarxa privada xifrada de **Tailscale**, pots accedir a Faristol (`http://<IP-Tailscale>:8080`) des del telèfon mòbil, tauleta o portàtil estigues on estigues (amb dades 4G/5G, a la universitat o fora de casa), sense exposar cap port a Internet pública.
 - **Captura d'Articles Web amb SingleFile des d'Android:**
   - Configurant l'extensió **SingleFile** a Firefox Android (Destinació ➔ *Upload to a REST Form API* ➔ `http://<IP-Tailscale>:23119/singlefile`), en prémer la icona de SingleFile al telèfon es capturen automàticament **dues versions alhora**:
