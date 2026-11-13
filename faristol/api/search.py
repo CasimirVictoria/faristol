@@ -305,7 +305,24 @@ async def cerca_academica_federada(
 
         try:
             from platforms import search_academic
-            data = await search_academic(query=q, sources=sources, limit=limit, expand=True)
+            try:
+                data = await asyncio.wait_for(
+                    search_academic(query=q, sources=sources, limit=limit, expand=True),
+                    timeout=14.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout en cerca acadèmica general per a '{q}', reintentant amb fonts ràpides.")
+                try:
+                    data = await asyncio.wait_for(
+                        search_academic(query=q, sources="arxiv,crossref,doaj", limit=limit, expand=False),
+                        timeout=7.0
+                    )
+                except Exception:
+                    data = {"results": [], "translations": {}}
+            except Exception as e_inner:
+                logger.warning(f"Avís en motor academic-spain: {e_inner}")
+                data = {"results": [], "translations": {}}
+
             results = []
             for paper in data.get("results", []):
                 year_val = str(paper.year) if hasattr(paper, 'year') and paper.year else (paper.published_date[:4] if paper.published_date else "")
@@ -341,7 +358,7 @@ async def cerca_academica_federada(
             }
         except Exception as e:
             logger.error(f"Error in academic search: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Error executant la cerca acadèmica: {e}")
+            return {"query": q, "translations": {}, "total": 0, "results": []}
 
     raise HTTPException(status_code=500, detail="Motor academic-spain no disponible")
 

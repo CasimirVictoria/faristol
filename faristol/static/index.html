@@ -254,10 +254,37 @@
                             <span title="Connectar EduVPN UV per a accés a revistes amb subscripció universitària">🔒 EduVPN</span>
                         </label>
                     </div>
+
+                    <!-- Xips ràpids d'àmbits -->
+                    <div class="tag-filter-bar" id="search-academic-chips" style="padding: 2px 0; background: transparent; border-bottom: none; gap: 4px; overflow-x: auto;">
+                        <span class="tag-chip active" data-source="all" title="Cercar a tots els motors">🌐 Tots (18)</span>
+                        <span class="tag-chip" data-source="legislacio" title="BOE Estatal i DOGV Valencià">⚖️ BOE / DOGV</span>
+                        <span class="tag-chip" data-source="dialnet,recolecta,tdr,teseo,redined" title="Dialnet, Recolecta i Tesis espanyoles">🇪🇸 Dialnet & Tesis</span>
+                        <span class="tag-chip" data-source="arxiv,scielo,doaj" title="arXiv, SciELO i revistes Open Access">🔓 arXiv & OA</span>
+                        <span class="tag-chip" data-source="opendata" title="datos.gob.es, INE i Subvencions">🏛️ Dades & INE</span>
+                        <span class="tag-chip" data-source="biomedicina" title="PubMed, EuropePMC i ClinicalTrials">🩺 Salut / BioMCP</span>
+                        <span class="tag-chip" data-source="catastro" title="Cadastre d'Espanya i mercat immobiliari">🏠 Cadastre</span>
+                        <span class="tag-chip" data-source="europarl" title="Debats i discursos del Parlament Europeu">🇪🇺 Europarl</span>
+                        <span class="tag-chip" data-source="sociopolitica" title="Eurostat, CIS i Eurobaròmetre">📊 Eurostat / CIS</span>
+                    </div>
+
+                    <!-- Historial de cerques recents -->
+                    <div id="search-academic-recents" style="display: none; padding: 2px 0; font-size: 11px; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none;">
+                        <span style="color: var(--text-muted); font-size: 10px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;">
+                            <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent);"></i> Recents:
+                        </span>
+                        <div id="search-academic-recents-list" style="display: flex; gap: 4px; align-items: center;"></div>
+                        <button class="btn btn-xs btn-icon-only" id="btn-clear-academic-recents" title="Netejar historial de cerca" style="font-size: 9px; padding: 1px 4px; color: var(--text-muted); background: transparent; border: none; cursor: pointer;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Banner de Traducció automàtica local Argos Translate -->
                 <div id="search-academic-banner" style="display: none; padding: 6px 10px; background: rgba(16, 185, 129, 0.08); border-bottom: 1px solid rgba(16, 185, 129, 0.2); font-size: 11px; color: var(--text-main); flex-shrink: 0;"></div>
+
+                <!-- Banner de coincidències a la pròpia biblioteca local -->
+                <div id="search-academic-local-matches" style="display: none; padding: 8px 10px; background: rgba(168, 85, 247, 0.08); border-bottom: 1px solid rgba(168, 85, 247, 0.25); flex-shrink: 0;"></div>
 
                 <!-- Llista de Resultats -->
                 <div id="search-academic-results" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 0;">

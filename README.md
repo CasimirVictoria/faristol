@@ -153,10 +153,17 @@ Faristol integra directament l'estudi de recerca i generació d'àudio de **Goog
 - **Citacions numèriques interactives amb salt al PDF:** Cada afirmació de NotebookLM inclou citacions de font; en fer clic sobre qualsevol cita, **Faristol obre automàticament el PDF corresponent al visor central i salta a la pàgina exacta** ressaltant el text d'evidència.
 - **Injecció a la nota i síntesi transversal:** Pots injectar la resposta de la IA directament a la teua nota oberta o exportar la conversa sencera a Markdown pur. Això crea automàticament retroenllaços bidireccionals que apareixen a la secció inferior **«Connexions de la nota»** vinculant la literatura analitzada.
 
-### 6. Cerca Acadèmica Federada en 35 Motors
-- Pestanya **[ 🌐 Cerca ]** connectada a `mcp-server-academic-spain`.
-- Consulta en paral·lel a repositoris nacionals i internacionals: Dialnet, OpenAlex, CSIC, arXiv, PubMed, ERIC, SciELO, DOAJ, DBLP, Recolecta, TDX, etc.
-- **Importació en 1 clic:** descàrrega en accés obert, registre BibTeX i creació de nota instantània mitjançant `add-paper`.
+### 6. Cerca Acadèmica Federada (18 fonts especialitzades i internacionals)
+La pestanya **[ 🌐 Cerca ]** transforma Faristol en una estació d'indagació i descobriment bibliogràfic connectada a `mcp-server-academic-spain`:
+- **Consulta en paral·lel multillenguatge:** Consulta bases nacionals i internacionals (Dialnet, OpenAlex, CSIC, arXiv, PubMed, ERIC, SciELO, DOAJ, Recolecta UPV, TDX, Butlletí Oficial de l'Estat BOE, DOGV, Dades Obertes datos.gob.es, INE, Cadastre i Parlament Europeu) amb traducció automàtica local transparent mitjançant Argos Translate.
+- **Xips d'Àmbits Ràpids (filtres tàctils en 1 clic):** Filtra a l'instant per categoria (`🌐 Tots (18)`, `⚖️ BOE / DOGV`, `🇪🇸 Dialnet & Tesis`, `🔓 arXiv & OA`, `🏛️ Dades & INE`, `🩺 Salut / BioMCP`, `🏠 Cadastre`, `🇪🇺 Europarl`, `📊 Eurostat / CIS`). En prémer qualsevol xip es commuta l'àmbit i es rellança la cerca immediatament si ja hi ha text escrit.
+- **Historial de Cerques Recents:** Desa les consultes darreres a l'emmagatzematge local (`localStorage`), mostrades com a pastilles compactes per reprendre cerques prèvies amb un sol toc o netejar-les amb el botó paperera.
+- **Creuament intel·ligent amb la Biblioteca Local:** Abans fins i tot de descarregar res, Faristol creua la paraula clau o termes de cerca amb els teus arxius locals (`state.notes` i `state.pdfs`), mostrant un avís destacat en color porpra amb accessos directes en 1 clic a les notes o PDFs que ja tens a la teua biblioteca per evitar duplicitats.
+- **Targetes de Resultat amb Accions Ràpides:**
+  - **`📋 Cita`:** Copia immediatament al porta-retalls la referència en format **BibTeX pur** amb citekey Pandoc llesta per enganxar.
+  - **`✨ Resum Exprés`:** Desplegable que sintetitza i destaca en punts clau les 3 idees essencials de l'abstract.
+  - **`📖 Llegir OA`:** Obre directament el PDF complet en accés obert en una pestanya nova.
+  - **`📥 Ingesta en 1 Clic`:** Descàrrega automàtica del PDF, extracció de metadades, registre BibTeX i creació de nota Markdown associada via `add-paper` / `zoterless`.
 
 ### 7. Visor Dual de Documents: PDFs i Captures Web HTML (Estil Zotero)
 Faristol replica i supera la comoditat de lectura de Zotero portant-la al món del text pla i del web obert, servint com a visor universal tant per a documents PDF com per a **captures web completes en format HTML (SingleFile)**:

@@ -104,9 +104,14 @@ const el = {
     btnToggleAntigravityTab: document.getElementById('btn-toggle-antigravity-tab'),
     searchAcademicInput: document.getElementById('search-academic-input'),
     searchAcademicSources: document.getElementById('search-academic-sources'),
+    searchAcademicChips: document.getElementById('search-academic-chips'),
+    searchAcademicRecents: document.getElementById('search-academic-recents'),
+    searchAcademicRecentsList: document.getElementById('search-academic-recents-list'),
+    btnClearAcademicRecents: document.getElementById('btn-clear-academic-recents'),
     searchAcademicVpn: document.getElementById('search-academic-vpn'),
     btnSearchAcademic: document.getElementById('btn-search-academic'),
     searchAcademicBanner: document.getElementById('search-academic-banner'),
+    searchAcademicLocalMatches: document.getElementById('search-academic-local-matches'),
     searchAcademicResults: document.getElementById('search-academic-results'),
     searchAcademicEmpty: document.getElementById('search-academic-empty'),
     nlmActiveTitle: document.getElementById('nlm-active-title'),
@@ -3043,6 +3048,33 @@ function configurarEvents() {
         });
     }
 
+    // Cerca acadèmica: Xips d'àmbits ràpids
+    if (el.searchAcademicChips) {
+        el.searchAcademicChips.addEventListener('click', (e) => {
+            const chip = e.target.closest('.tag-chip');
+            if (!chip) return;
+            const srcVal = chip.dataset.source;
+            el.searchAcademicChips.querySelectorAll('.tag-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            if (el.searchAcademicSources) {
+                el.searchAcademicSources.value = srcVal;
+                el.searchAcademicSources.dispatchEvent(new Event('change'));
+            }
+            if (el.searchAcademicInput && el.searchAcademicInput.value.trim().length >= 2) {
+                executarCercaAcademicaFaristol();
+            }
+        });
+    }
+
+    // Cerca acadèmica: Netejar historial recent
+    if (el.btnClearAcademicRecents) {
+        el.btnClearAcademicRecents.onclick = () => {
+            localStorage.removeItem('faristol_academic_recents');
+            renderitzarCerquesRecentsAcademiques();
+        };
+    }
+    renderitzarCerquesRecentsAcademiques();
+
     // NotebookLM panell events
     if (el.btnNlmSend) {
         el.btnNlmSend.onclick = () => enviarNlmPregunta();
@@ -4150,6 +4182,122 @@ async function importarPaperZoterless() {
 }
 
 // --- Cerca Acadèmica Federada (18 fonts) ---
+function getCerquesRecentsAcademiques() {
+    try {
+        const raw = localStorage.getItem('faristol_academic_recents');
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function afegirCercaRecent(q, source) {
+    if (!q || q.trim().length < 2) return;
+    try {
+        let recents = getCerquesRecentsAcademiques();
+        recents = recents.filter(r => r.q.toLowerCase() !== q.trim().toLowerCase());
+        recents.unshift({ q: q.trim(), source: source || 'all', time: Date.now() });
+        recents = recents.slice(0, 8);
+        localStorage.setItem('faristol_academic_recents', JSON.stringify(recents));
+        renderitzarCerquesRecentsAcademiques();
+    } catch {}
+}
+
+function carregarCercaRecent(q, source) {
+    if (el.searchAcademicInput) el.searchAcademicInput.value = q;
+    if (el.searchAcademicSources && source) {
+        el.searchAcademicSources.value = source;
+        el.searchAcademicSources.dispatchEvent(new Event('change'));
+    }
+    if (el.searchAcademicChips) {
+        el.searchAcademicChips.querySelectorAll('.tag-chip').forEach(c => {
+            if (c.dataset.source === source) c.classList.add('active');
+            else c.classList.remove('active');
+        });
+    }
+    executarCercaAcademicaFaristol();
+}
+
+function renderitzarCerquesRecentsAcademiques() {
+    if (!el.searchAcademicRecents || !el.searchAcademicRecentsList) return;
+    const recents = getCerquesRecentsAcademiques();
+    if (recents.length === 0) {
+        el.searchAcademicRecents.style.display = 'none';
+        return;
+    }
+    el.searchAcademicRecents.style.display = 'flex';
+    el.searchAcademicRecentsList.innerHTML = recents.map(r => `
+        <button class="tag-chip" style="font-size: 10px; padding: 2px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;" onclick="carregarCercaRecent('${escapeHtml(r.q).replace(/'/g, "\\'")}', '${escapeHtml(r.source)}')">
+            <i class="fa-solid fa-clock-rotate-left" style="font-size: 9px; opacity: 0.6;"></i>
+            <span>${escapeHtml(r.q)}</span>
+        </button>
+    `).join('');
+}
+
+async function copiarCitaAcademic(idx) {
+    const items = window._lastAcademicResults || [];
+    const item = items[idx];
+    if (!item) return;
+    const btn = document.getElementById(`btn-copy-cite-${idx}`);
+    const authors = Array.isArray(item.authors) ? item.authors.join(' and ') : (item.authors || 'Unknown');
+    const firstAuthor = (Array.isArray(item.authors) && item.authors[0]) ? item.authors[0].split(/[\s,]+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '') : 'author';
+    const year = item.year || new Date().getFullYear();
+    const firstWord = (item.title || 'work').split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const citekey = `${firstAuthor}${year}${firstWord}`;
+
+    let bib = `@article{${citekey},\n`;
+    bib += `  author = {${authors}},\n`;
+    bib += `  title = {${item.title || ''}},\n`;
+    if (item.journal) bib += `  journal = {${item.journal}},\n`;
+    if (item.year) bib += `  year = {${item.year}},\n`;
+    if (item.doi) bib += `  doi = {${item.doi}},\n`;
+    if (item.url) bib += `  url = {${item.url}},\n`;
+    bib += `}`;
+
+    try {
+        await navigator.clipboard.writeText(bib);
+        if (btn) {
+            const oldHtml = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-check" style="color: #10b981;"></i> Copiat!`;
+            setTimeout(() => { btn.innerHTML = oldHtml; }, 1500);
+        }
+    } catch (e) {
+        prompt("Copia la cita BibTeX:", bib);
+    }
+}
+
+function alternarResumExpress(idx) {
+    const items = window._lastAcademicResults || [];
+    const item = items[idx];
+    const box = document.getElementById(`resum-express-${idx}`);
+    if (!box || !item) return;
+
+    if (box.style.display !== 'none') {
+        box.style.display = 'none';
+        return;
+    }
+
+    const abs = (item.abstract || '').trim();
+    if (!abs) {
+        box.innerHTML = `<span style="color: var(--text-muted); font-size: 11px;"><i class="fa-solid fa-circle-info"></i> Aquesta publicació no inclou resum/abstract en obert.</span>`;
+        box.style.display = 'block';
+        return;
+    }
+
+    const rawSentences = abs.split(/(?<=[.?!])\s+/).map(s => s.trim()).filter(s => s.length > 25);
+    const bullets = rawSentences.slice(0, 3);
+
+    box.innerHTML = `
+        <div style="font-weight: 700; color: #a855f7; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Punts clau de l'abstract:
+        </div>
+        <ul style="margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; color: var(--text-main); line-height: 1.35;">
+            ${bullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}
+        </ul>
+    `;
+    box.style.display = 'block';
+}
+
 async function executarCercaAcademicaFaristol() {
     const q = (el.searchAcademicInput ? el.searchAcademicInput.value : '').trim();
     if (!q) {
@@ -4158,6 +4306,50 @@ async function executarCercaAcademicaFaristol() {
     }
     
     const sources = el.searchAcademicSources ? el.searchAcademicSources.value : 'all';
+    afegirCercaRecent(q, sources);
+
+    // Creuament amb la biblioteca local
+    if (el.searchAcademicLocalMatches) {
+        const qTerms = q.toLowerCase().split(/\s+/).filter(t => t.length >= 3);
+        const localMatches = [];
+        if (qTerms.length > 0) {
+            (state.notes || []).forEach(n => {
+                const fullTxt = `${n.title || ''} ${n.filename || ''} ${n.author || ''} ${(n.tags || []).join(' ')}`.toLowerCase();
+                if (qTerms.some(term => fullTxt.includes(term))) {
+                    localMatches.push({ type: 'note', filename: n.filename, title: n.title || n.filename });
+                }
+            });
+            (state.pdfs || []).forEach(p => {
+                const fullTxt = `${p.filename || ''} ${p.title || ''}`.toLowerCase();
+                if (qTerms.some(term => fullTxt.includes(term))) {
+                    const stem = p.filename.replace(/\.pdf$/i, '');
+                    if (!localMatches.some(m => m.filename.replace(/\.(md|org)$/i, '') === stem)) {
+                        localMatches.push({ type: 'pdf', filename: p.filename, title: p.title || p.filename });
+                    }
+                }
+            });
+        }
+
+        if (localMatches.length > 0) {
+            el.searchAcademicLocalMatches.innerHTML = `
+                <div style="font-size: 11px; font-weight: 700; color: #9333ea; display: flex; align-items: center; gap: 6px; margin-bottom: 5px;">
+                    <i class="fa-solid fa-folder-open"></i> A la teua biblioteca local ja tens <strong>${localMatches.length}</strong> recurs(os) relacionat(s):
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    ${localMatches.slice(0, 6).map(m => `
+                        <button class="btn btn-sm" onclick="${m.type === 'note' ? `obrirNota('${escapeHtml(m.filename)}')` : `obrirPdf('${escapeHtml(m.filename)}', true)`}" style="font-size: 10px; padding: 2px 7px; background: rgba(147, 51, 234, 0.12); border: 1px solid rgba(147, 51, 234, 0.35); color: #9333ea; border-radius: 4px; max-width: 210px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${escapeHtml(m.title)}">
+                            <i class="fa-solid ${m.type === 'note' ? 'fa-note-sticky' : 'fa-book'}"></i> ${escapeHtml(m.title)}
+                        </button>
+                    `).join('')}
+                    ${localMatches.length > 6 ? `<span style="font-size: 10px; color: var(--text-muted); align-self: center; margin-left: 2px;">+${localMatches.length - 6} més</span>` : ''}
+                </div>
+            `;
+            el.searchAcademicLocalMatches.style.display = 'block';
+        } else {
+            el.searchAcademicLocalMatches.style.display = 'none';
+            el.searchAcademicLocalMatches.innerHTML = '';
+        }
+    }
     
     if (el.searchAcademicBanner) el.searchAcademicBanner.style.display = 'none';
     if (el.searchAcademicResults) {
@@ -4233,6 +4425,8 @@ async function executarCercaAcademicaFaristol() {
         }
         
         const items = data.results || [];
+        window._lastAcademicResults = items;
+
         if (items.length === 0) {
             if (sources === 'boe') {
                 el.searchAcademicResults.innerHTML = `
@@ -4358,18 +4552,35 @@ async function executarCercaAcademicaFaristol() {
                     </details>
                     ` : ''}
 
-                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 4px;" id="search-card-actions-${idx}">
-                        ${jaImportat ? `
-                            <span style="color: #10b981; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
-                                <i class="fa-solid fa-check"></i> A la biblioteca
-                            </span>
-                            ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${escapeHtml(noteCand.filename)}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
-                            ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${escapeHtml(pdfCand.filename)}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
-                        ` : `
-                            <button class="btn btn-sm ${isLeg || isBio ? '' : 'btn-primary'}" id="btn-import-card-${idx}" onclick="importarArticleDesDeCerca('${escapeHtml(ident).replace(/'/g, "\\'")}', ${idx}, '${escapeHtml(directPdfToPass).replace(/'/g, "\\'")}')" style="font-size: 11px; padding: 3px 8px; ${btnBg}">
-                                <i class="fa-solid ${btnIcon}"></i> ${btnLabel}
+                    <div id="resum-express-${idx}" style="display: none; font-size: 11px; background: var(--bg-main); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 4px; padding: 6px 8px; margin-top: 4px;"></div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap;" id="search-card-actions-${idx}">
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <button class="btn btn-sm btn-outline" id="btn-copy-cite-${idx}" onclick="copiarCitaAcademic(${idx})" title="Copiar cita BibTeX" style="font-size: 10px; padding: 2px 6px;">
+                                <i class="fa-regular fa-copy"></i> Cita
                             </button>
-                        `}
+                            <button class="btn btn-sm btn-outline" onclick="alternarResumExpress(${idx})" title="Punts clau de l'abstract" style="font-size: 10px; padding: 2px 6px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Resum
+                            </button>
+                            ${(directPdfToPass || item.oa_url) ? `
+                                <a href="${urlSegura(directPdfToPass || item.oa_url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="font-size: 10px; padding: 2px 6px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Llegir OA
+                                </a>
+                            ` : ''}
+                        </div>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            ${jaImportat ? `
+                                <span style="color: #10b981; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; margin-right: 4px;">
+                                    <i class="fa-solid fa-check"></i> A la biblioteca
+                                </span>
+                                ${noteCand ? `<button class="btn btn-sm" onclick="obrirNota('${escapeHtml(noteCand.filename)}')" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-note-sticky"></i> Nota</button>` : ''}
+                                ${pdfCand ? `<button class="btn btn-sm" onclick="obrirPdf('${escapeHtml(pdfCand.filename)}', true)" style="font-size: 11px; padding: 2px 6px;"><i class="fa-solid fa-book"></i> PDF</button>` : ''}
+                            ` : `
+                                <button class="btn btn-sm ${isLeg || isBio ? '' : 'btn-primary'}" id="btn-import-card-${idx}" onclick="importarArticleDesDeCerca('${escapeHtml(ident).replace(/'/g, "\\'")}', ${idx}, '${escapeHtml(directPdfToPass).replace(/'/g, "\\'")}')" style="font-size: 11px; padding: 3px 8px; ${btnBg}">
+                                    <i class="fa-solid ${btnIcon}"></i> ${btnLabel}
+                                </button>
+                            `}
+                        </div>
                     </div>
                 </div>
             `;
