@@ -4539,7 +4539,7 @@ async function executarCercaAcademicaFaristol() {
             return `
                 <div class="search-result-card" id="search-card-${idx}" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-left: 4px solid ${cardBorderColor}; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 6px;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                        <div style="font-size: 12px; font-weight: 700; color: var(--text-main); line-height: 1.35;">
+                        <div style="font-size: 13.5px; font-weight: 700; color: var(--text-main); line-height: 1.35;">
                             ${escapeHtml(title)}
                         </div>
                     </div>
@@ -4548,39 +4548,39 @@ async function executarCercaAcademicaFaristol() {
                         ${legBadge}
                         ${rangoBadge}
                         ${oaBadge}
-                        ${sourcesList.filter(s => s !== "BOE" && s !== "DOGV" && !s.includes("BioMCP")).map(s => `<span style="background: rgba(56, 189, 248, 0.15); color: #0284c7; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏷️ ${escapeHtml(s)}</span>`).join(' ')}
+                        ${sourcesList.filter(s => s !== "BOE" && s !== "DOGV" && !s.includes("BioMCP")).map(s => `<span style="background: rgba(56, 189, 248, 0.15); color: #0284c7; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 4px;">🏷️ ${escapeHtml(s)}</span>`).join(' ')}
                     </div>
 
-                    <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;">
+                    <div style="font-size: 12px; color: var(--text-muted); line-height: 1.35;">
                         ${authors ? `${isLeg ? '🏛️' : (isBio ? '🩺' : '👤')} <strong>${escapeHtml(authors)}</strong> ` : ''}
                         ${item.journal ? (authors ? `(${escapeHtml(item.journal)}${year ? `, ${year}` : ''})` : `<strong>${escapeHtml(item.journal)}</strong> ${year ? `(${year})` : ''}`) : (year ? `(${year})` : '')}
                         ${urlSegura(doiUrl) ? ` | 🔗 <a href="${urlSegura(doiUrl)}" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">DOI: ${escapeHtml(doi)}</a>` : ''}
                         ${(isBoe && urlSegura(item.url)) ? ` | 🔗 <a href="${urlSegura(item.url)}" target="_blank" rel="noopener" style="color: #d97706; text-decoration: underline; font-weight: 500;">Text consolidat BOE</a>` : ''}
                         ${(isDogv && urlSegura(item.url)) ? ` | 🔗 <a href="${urlSegura(item.url)}" target="_blank" rel="noopener" style="color: #0891b2; text-decoration: underline; font-weight: 500;">Disposició DOGV</a>` : ''}
                         ${(isBio && pmid && /^\d+$/.test(String(pmid).trim())) ? ` | 🔗 <a href="https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(String(pmid).trim())}/" target="_blank" rel="noopener" style="color: #10b981; text-decoration: underline; font-weight: 500;">PubMed (PMID: ${escapeHtml(pmid)})</a>` : ''}
-                        ${(isBoe && boeId) ? ` | <span style="font-family: monospace; font-size: 10px; color: var(--text-muted);">${escapeHtml(boeId)}</span>` : ''}
-                        ${(isDogv && dogvSig) ? ` | <span style="font-family: monospace; font-size: 10px; color: var(--text-muted);">${escapeHtml(dogvSig)}</span>` : ''}
+                        ${(isBoe && boeId) ? ` | <span style="font-family: monospace; font-size: 11px; color: var(--text-muted);">${escapeHtml(boeId)}</span>` : ''}
+                        ${(isDogv && dogvSig) ? ` | <span style="font-family: monospace; font-size: 11px; color: var(--text-muted);">${escapeHtml(dogvSig)}</span>` : ''}
                     </div>
 
                     ${abs ? `
-                    <details style="font-size: 11px; color: var(--text-main); background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px;">
-                        <summary style="cursor: pointer; font-weight: 600; color: var(--text-muted); font-size: 10px;">📖 ${isLeg ? 'Mostrar preàmbul / disposició' : 'Mostrar resum / abstract'}</summary>
+                    <details style="font-size: 12px; color: var(--text-main); background: var(--bg-main); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 4px 8px;">
+                        <summary style="cursor: pointer; font-weight: 600; color: var(--text-muted); font-size: 11px;">📖 ${isLeg ? 'Mostrar preàmbul / disposició' : 'Mostrar resum / abstract'}</summary>
                         <div style="margin-top: 4px; line-height: 1.45; white-space: pre-line;">${escapeHtml(abs)}</div>
                     </details>
                     ` : ''}
 
-                    <div id="resum-express-${idx}" style="display: none; font-size: 11px; background: var(--bg-main); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 4px; padding: 6px 8px; margin-top: 4px;"></div>
+                    <div id="resum-express-${idx}" style="display: none; font-size: 12px; background: var(--bg-main); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 4px; padding: 6px 8px; margin-top: 4px;"></div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap;" id="search-card-actions-${idx}">
                         <div style="display: flex; gap: 4px; align-items: center;">
-                            <button class="btn btn-sm btn-outline" id="btn-copy-cite-${idx}" onclick="copiarCitaAcademic(${idx})" title="Copiar cita BibTeX" style="font-size: 10px; padding: 2px 6px;">
+                            <button class="btn btn-sm btn-outline" id="btn-copy-cite-${idx}" onclick="copiarCitaAcademic(${idx})" title="Copiar cita BibTeX" style="font-size: 11px; padding: 2px 7px;">
                                 <i class="fa-regular fa-copy"></i> Cita
                             </button>
-                            <button class="btn btn-sm btn-outline" onclick="alternarResumExpress(${idx})" title="Punts clau de l'abstract" style="font-size: 10px; padding: 2px 6px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">
+                            <button class="btn btn-sm btn-outline" onclick="alternarResumExpress(${idx})" title="Punts clau de l'abstract" style="font-size: 11px; padding: 2px 7px; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> Resum
                             </button>
                             ${(directPdfToPass || item.oa_url) ? `
-                                <a href="${urlSegura(directPdfToPass || item.oa_url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="font-size: 10px; padding: 2px 6px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
+                                <a href="${urlSegura(directPdfToPass || item.oa_url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline" style="font-size: 11px; padding: 2px 7px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
                                     <i class="fa-solid fa-arrow-up-right-from-square"></i> Llegir OA
                                 </a>
                             ` : ''}
