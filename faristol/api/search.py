@@ -449,8 +449,6 @@ citekey: "@{clean_key}"
 
     add_paper_cmd = shutil.which("add-paper") or str(Path.home() / ".local" / "bin" / "add-paper")
     cmd = [add_paper_cmd]
-    if req.vpn:
-        cmd.append("--vpn")
     if req.pdf_url:
         pdf_u_clean = req.pdf_url.strip()
         if pdf_u_clean.startswith("-"):

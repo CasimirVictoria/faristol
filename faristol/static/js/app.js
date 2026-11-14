@@ -108,7 +108,6 @@ const el = {
     searchAcademicRecents: document.getElementById('search-academic-recents'),
     searchAcademicRecentsList: document.getElementById('search-academic-recents-list'),
     btnClearAcademicRecents: document.getElementById('btn-clear-academic-recents'),
-    searchAcademicVpn: document.getElementById('search-academic-vpn'),
     btnSearchAcademic: document.getElementById('btn-search-academic'),
     searchAcademicBanner: document.getElementById('search-academic-banner'),
     searchAcademicLocalMatches: document.getElementById('search-academic-local-matches'),
@@ -3058,10 +3057,29 @@ function configurarEvents() {
             chip.classList.add('active');
             if (el.searchAcademicSources) {
                 el.searchAcademicSources.value = srcVal;
-                el.searchAcademicSources.dispatchEvent(new Event('change'));
             }
             if (el.searchAcademicInput && el.searchAcademicInput.value.trim().length >= 2) {
                 executarCercaAcademicaFaristol();
+            }
+        });
+    }
+
+    // Sincronitzar canvi de desplegable amb xips
+    if (el.searchAcademicSources && el.searchAcademicChips) {
+        el.searchAcademicSources.addEventListener('change', () => {
+            const val = el.searchAcademicSources.value;
+            let matched = false;
+            el.searchAcademicChips.querySelectorAll('.tag-chip').forEach(c => {
+                if (c.dataset.source === val) {
+                    c.classList.add('active');
+                    matched = true;
+                } else {
+                    c.classList.remove('active');
+                }
+            });
+            if (!matched) {
+                const allChip = el.searchAcademicChips.querySelector('[data-source="all"]');
+                if (allChip) allChip.classList.add('active');
             }
         });
     }
@@ -4143,7 +4161,6 @@ async function importarPaperZoterless() {
         return;
     }
     
-    const vpn = document.getElementById('import-zoterless-vpn')?.checked || false;
     tancarModals();
     el.libraryStatus.textContent = "Ingerint amb zoterless (DOI, PDF, BibTeX i Nota)...";
     
@@ -4151,7 +4168,7 @@ async function importarPaperZoterless() {
         const res = await fetch('/api/academic/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ identifier: ident, vpn: vpn })
+            body: JSON.stringify({ identifier: ident, vpn: false })
         });
         
         const data = await res.json();
@@ -4601,7 +4618,6 @@ async function executarCercaAcademicaFaristol() {
 async function importarArticleDesDeCerca(ident, idx, pdfUrl = '') {
     const btn = document.getElementById(`btn-import-card-${idx}`);
     const actionsDiv = document.getElementById(`search-card-actions-${idx}`);
-    const vpn = el.searchAcademicVpn ? el.searchAcademicVpn.checked : false;
     
     if (btn) {
         btn.disabled = true;
@@ -4614,7 +4630,7 @@ async function importarArticleDesDeCerca(ident, idx, pdfUrl = '') {
         const res = await fetch('/api/academic/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ identifier: ident, vpn: vpn, pdf_url: pdfUrl })
+            body: JSON.stringify({ identifier: ident, vpn: false, pdf_url: pdfUrl })
         });
         
         const data = await res.json();
